@@ -1,0 +1,8 @@
+# @package mae
+# Blocks with the most ligand mass: predict the ligand from the pocket. 0.25 ~ the ligand's footprint.
+defaults:
+  - _base
+  - _self_
+mask_strategy: ligand
+mask_ratio: 0.25
+mask_atom_tau: 0.5

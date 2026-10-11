@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ring Non-flatness Explorer</title>
+<!-- Source: figures/fig-qual/ring_nonflatness_site.html. build_ring_nonflatness_site.py copies it
+     next to the data it builds; edit this file, not the copy under .cache/. -->
+<style>
+:root {
+  --bg: #f7f8fa; --panel: #ffffff; --ink: #1b1f27; --muted: #5d6675; --line: #e2e5eb;
+  --accent: #3C5FDF; --accent-soft: #e8edfd; --fail: #c8313d; --warn: #b7791f; --pass: #2f855a;
+  --plane: #f2bf33; --viewer: #ffffff; --row-hover: #f1f4fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --panel: #171b21; --ink: #e6e9ee; --muted: #9aa3b2; --line: #2a3039;
+    --accent: #7f98f5; --accent-soft: #1e2640; --fail: #ef6b73; --warn: #e0a54a; --pass: #5cc38a;
+    --viewer: #11151a; --row-hover: #1e232b;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --panel: #171b21; --ink: #e6e9ee; --muted: #9aa3b2; --line: #2a3039;
+  --accent: #7f98f5; --accent-soft: #1e2640; --fail: #ef6b73; --warn: #e0a54a; --pass: #5cc38a;
+  --viewer: #11151a; --row-hover: #1e232b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+header { padding: 20px 24px 8px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 15px; margin: 0 0 10px; }
+.sub { color: var(--muted); font-size: 13px; }
+main { padding: 8px 24px 40px; display: grid; gap: 16px; max-width: 1500px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 12px; }
+select, button, input { font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+details summary { cursor: pointer; font-weight: 600; }
+details ul { margin: 8px 0 0; padding-left: 20px; }
+code { font-size: 12.5px; background: var(--accent-soft); padding: 1px 4px; border-radius: 4px; }
+.two { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.tablewrap { overflow: auto; max-height: 360px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 600; }
+tbody tr.click { cursor: pointer; }
+tbody tr.click:hover, tbody tr.sel { background: var(--row-hover); }
+.hists { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.hists svg { width: 100%; height: auto; }
+.hists .t { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.browser { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; }
+@media (max-width: 900px) { .browser { grid-template-columns: 1fr; } }
+.filters { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 8px; align-items: center; margin-bottom: 10px; }
+.filters label { color: var(--muted); font-size: 12px; }
+.filters select { width: 100%; min-width: 0; }
+.list { overflow: auto; max-height: 560px; border: 1px solid var(--line); border-radius: 8px; }
+.badge { display: inline-block; padding: 0 6px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.b-fail { color: var(--fail); background: color-mix(in srgb, var(--fail) 14%, transparent); }
+.b-sign-dependent { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.b-pass { color: var(--pass); background: color-mix(in srgb, var(--pass) 14%, transparent); }
+.b-not-checked { color: var(--muted); background: var(--accent-soft); }
+#viewport { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 8px; background: var(--viewer); position: relative; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 8px 0; }
+.toolbar label { font-size: 13px; }
+.info { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; font-size: 13px; }
+.info dt { color: var(--muted); }
+.info dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+.jump { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.more { width: 100%; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 8px; color: var(--accent); }
+.err { color: var(--fail); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Ring non-flatness explorer</h1>
+    <div class="sub">PoseBusters <code>non-aromatic_ring_non-flatness</code>, re-derived ring by ring · 79 pockets</div>
+  </div>
+  <div style="margin-left:auto; display:flex; gap:8px; align-items:center">
+    <label class="sub" for="arm">arm</label><select id="arm"></select>
+    <button id="theme" title="toggle light/dark">◐</button>
+  </div>
+</header>
+
+<main>
+  <section class="tiles" id="tiles"></section>
+
+  <section class="card">
+    <details>
+      <summary>What the check actually tests (posebusters 0.6.5)</summary>
+      <ul>
+        <li><b>Only 6-membered non-aromatic rings</b> with 0–2 double bonds (cyclohexane, cyclohexene, the cyclohexadienes,
+          piperidine, piperazine, morpholine, dihydropyridines). The 5-ring pattern is commented out upstream, so
+          <b>a flat cyclopentane or pyrrolidine can never fail it</b>. The 5-ring table below applies the same threshold anyway.</li>
+        <li>A ring passes if at least one atom sits <b>≥ 0.05 Å</b> from the ring's best-fit (SVD) plane.</li>
+        <li><b>The distance is signed:</b> PoseBusters takes <code>max(d)</code>, not <code>max(|d|)</code>, and the SVD normal's sign is
+          arbitrary. So a ring bent to one side only can fail with |d| = 0.08 Å. Statuses here:
+          <span class="badge b-fail">fail</span> fails for both signs ·
+          <span class="badge b-sign-dependent">sign-dependent</span> fails for one sign only ·
+          <span class="badge b-pass">pass</span> passes for both signs.</li>
+        <li><b>MMFF overlay:</b> the same molecule minimised with MMFF (UFF when MMFF has no parameters), starting from the generated
+          pose and superposed on the ring atoms. If the relaxed ring is also under 0.05 Å, the force field wants it flat too.</li>
+      </ul>
+    </details>
+  </section>
+
+  <section class="two">
+    <div class="card">
+      <h2>Checked 6-rings by ring core <span class="sub">— click a row to browse it</span></h2>
+      <div class="tablewrap"><table id="t6"></table></div>
+    </div>
+    <div class="card">
+      <h2>5-membered rings: never checked, but are they flat? <span class="sub">— click a row to browse it</span></h2>
+      <div class="tablewrap"><table id="t5"></table></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>max |distance to ring plane| — generated vs crystal reference ligands</h2>
+    <div class="hists" id="hists"></div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--accent)"></span>generated (density)</span>
+      <span><span class="sw" style="background:none;border:2px solid var(--ink)"></span>crystal ligands (density)</span>
+      <span><span class="sw" style="background:var(--fail)"></span>0.05 Å threshold</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Browse rings</h2>
+    <div class="browser">
+      <div>
+        <div class="filters">
+          <label for="f-name">ring</label><select id="f-name"></select>
+          <label for="f-status">status</label>
+          <select id="f-status">
+            <option value="bad">fail + sign-dependent</option><option value="fail">fail</option>
+            <option value="sign-dependent">sign-dependent</option><option value="pass">pass</option>
+            <option value="not checked">not checked</option><option value="any">any</option>
+          </select>
+          <label for="f-sp3">atoms</label>
+          <select id="f-sp3"><option value="any">any</option><option value="sp3">all-sp3 ring</option><option value="sp2">has sp2 atoms</option></select>
+          <label for="f-sort">sort</label>
+          <select id="f-sort"><option value="flat">flattest first</option><option value="pucker">most puckered first</option>
+            <option value="ffflat">MMFF also flat first</option><option value="target">target</option></select>
+        </div>
+        <div class="sub" id="count"></div>
+        <div class="list"><table id="list"></table></div>
+        <div class="jump" id="jump"></div>
+      </div>
+      <div>
+        <div id="viewport"></div>
+        <div class="toolbar">
+          <button id="prev">◀ prev</button><button id="next">next ▶</button>
+          <label><input type="checkbox" id="o-pocket" checked> pocket (5 Å)</label>
+          <label><input type="checkbox" id="o-relax" checked> MMFF overlay</label>
+          <label><input type="checkbox" id="o-plane" checked> plane</label>
+          <label><input type="checkbox" id="o-labels" checked> distances</label>
+          <button id="center">re-center</button>
+        </div>
+        <div class="legend">
+          <span><span class="sw" style="background:#e03131"></span>ring in question</span>
+          <span><span class="sw" style="background:#8a8a8a"></span>MMFF-relaxed copy</span>
+          <span><span class="sw" style="background:var(--plane)"></span>best-fit plane + normal</span>
+          <span>labels: signed distance to the plane (Å)</span>
+        </div>
+        <dl class="info" id="info"></dl>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="ngl.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const fmt = (v, d = 3) => (v === null || v === undefined || Number.isNaN(v)) ? "–" : Number(v).toFixed(d);
+const pct = (v) => (v === null || v === undefined) ? "–" : `${Math.round(100 * v)}%`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const badge = (s) => `<span class="badge b-${s.replace(" ", "-")}">${s}</span>`;
+
+let ARM = null, DATA = null, ROWS = [], VIEW = [], SHOWN = 200, CUR = -1;
+const cache = {};
+let stage = null, loadToken = 0, focus = null;   // focus: [ligand component, ring selection]
+
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+// ── hash state: #arm=CoDE&t=target_14&k=76&r=0 ──
+function readHash() { return Object.fromEntries(new URLSearchParams(location.hash.slice(1))); }
+function writeHash(o) { history.replaceState(null, "", "#" + new URLSearchParams(o).toString()); }
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  return r.json();
+}
+
+async function init() {
+  stage = new NGL.Stage("viewport", {backgroundColor: cssVar("--viewer"), tooltip: true});
+  addEventListener("resize", () => stage.handleResize());
+  const arms = await getJSON("data/arms.json");
+  const h = readHash();
+  $("arm").innerHTML = arms.map((a) => `<option>${esc(a)}</option>`).join("");
+  $("arm").value = arms.includes(h.arm) ? h.arm : arms[0];
+  $("arm").onchange = () => loadArm($("arm").value);
+  for (const id of ["f-name", "f-status", "f-sp3", "f-sort"]) $(id).onchange = () => { SHOWN = 200; filter(); };
+  for (const id of ["o-pocket", "o-relax", "o-plane", "o-labels"]) $(id).onchange = () => CUR >= 0 && show(CUR, false);
+  $("prev").onclick = () => step(-1);
+  $("next").onclick = () => step(1);
+  $("center").onclick = () => focus && focus[0].autoView(focus[1], 400);
+  $("theme").onclick = () => {
+    document.documentElement.dataset.theme = isDark() ? "light" : "dark";
+    stage.setParameters({backgroundColor: cssVar("--viewer")});
+    if (CUR >= 0) show(CUR, false);
+    drawHists();
+  };
+  addEventListener("keydown", (e) => {
+    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowDown" || e.key === "j") { step(1); e.preventDefault(); }
+    if (e.key === "ArrowUp" || e.key === "k") { step(-1); e.preventDefault(); }
+  });
+  await loadArm($("arm").value, h);
+}
+
+async function loadArm(arm, h = {}) {
+  ARM = arm;
+  DATA = cache[arm] || (cache[arm] = await getJSON(`data/${arm}/index.json`));
+  const K = DATA.keys;
+  ROWS = DATA.rows.map((r, i) => Object.fromEntries(K.map((k, j) => [k, r[j]]).concat([["i", i]])));
+  renderSummary();
+  const names = {};
+  for (const r of ROWS) {
+    const n = names[r.name] || (names[r.name] = {n: 0, bad: 0, size: r.size});
+    n.n++; if (r.status === "fail" || r.status === "sign-dependent") n.bad++;
+  }
+  const order = Object.entries(names).sort((a, b) => b[1].bad - a[1].bad || b[1].n - a[1].n);
+  $("f-name").innerHTML = `<option value="*">all ring types</option>` +
+    order.map(([n, v]) => `<option value="${esc(n)}">${esc(n)} · ${v.size}-ring · ${v.bad}/${v.n}</option>`).join("");
+  $("f-name").value = order[0][0];
+  renderJumps();
+  if (h.t) {
+    const r = ROWS.find((x) => x.target === h.t && String(x.k) === h.k && String(x.ring) === (h.r || "0"));
+    if (r) { $("f-name").value = r.name; $("f-status").value = "any"; $("f-sp3").value = "any"; filter(); show(VIEW.indexOf(r)); return; }
+  }
+  filter();
+  if (VIEW.length) show(0);
+}
+
+function renderSummary() {
+  const s = DATA.summary;
+  const ct = s.crosstab, sd = Object.values(ct).reduce((a, o) => a + (o["sign-dependent"] || 0), 0);
+  $("tiles").innerHTML = [
+    [s.n_mols.toLocaleString(), `molecules · ${s.n_pockets} pockets · ${s.n_rings.toLocaleString()} non-aromatic rings`],
+    [pct(s.fail_rate), "of molecules fail ring non-flatness (stored PoseBusters verdict)"],
+    [`${s.all_sp3_6.failing} / ${s.all_sp3_6.checked}`, "all-sp3 6-rings (true cyclohexane-type) that fail"],
+    [pct(s.ff_also_flat), `of ${s.n_failing_rings.toLocaleString()} failing rings stay flat after MMFF relaxation`],
+    [sd.toLocaleString(), "molecules whose verdict depends on the arbitrary sign of the plane normal"],
+  ].map(([b, t]) => `<div class="tile"><b>${b}</b><span>${t}</span></div>`).join("");
+
+  const t6 = s.by_name.filter((r) => r.n_rings >= 3);
+  $("t6").innerHTML = `<thead><tr><th>ring core</th><th>rings</th><th>fail</th><th>sign-dep.</th><th>fail rate</th>
+    <th title="share of rings whose atoms are all sp3">all-sp3</th><th>median max|d|</th><th title="failing rings still < 0.05 Å after MMFF">MMFF also flat</th></tr></thead><tbody>` +
+    t6.map((r) => `<tr class="click" data-name="${esc(r.name)}" data-status="bad"><td>${esc(r.name)}</td><td>${r.n_rings}</td><td>${r.fail}</td>
+      <td>${r.sign_dep}</td><td>${pct(r.fail_rate)}</td><td>${pct(r.all_sp3)}</td><td>${fmt(r.median_max_abs_dev)}</td><td>${pct(r.ff_also_flat)}</td></tr>`).join("") + "</tbody>";
+  const t5 = s.five.filter((r) => r.n_rings >= 3);
+  $("t5").innerHTML = `<thead><tr><th>ring core</th><th>rings</th><th>median max|d|</th><th title="share under 0.05 Å, if PoseBusters checked 5-rings">&lt; 0.05 Å</th>
+    <th>all-sp3 rings</th><th>&lt; 0.05 Å (all-sp3)</th><th>median (all-sp3)</th><th>median after MMFF</th></tr></thead><tbody>` +
+    t5.map((r) => `<tr class="click" data-name="${esc(r.name)}" data-status="not checked"><td>${esc(r.name)}</td><td>${r.n_rings}</td><td>${fmt(r.median_max_abs_dev)}</td>
+      <td>${pct(r.would_fail)}</td><td>${r.n_all_sp3}</td><td>${pct(r.would_fail_all_sp3)}</td><td>${fmt(r.median_all_sp3)}</td><td>${fmt(r.relaxed_median)}</td></tr>`).join("") + "</tbody>";
+  for (const tr of document.querySelectorAll("#t6 tr.click, #t5 tr.click")) {
+    tr.onclick = () => {
+      $("f-name").value = tr.dataset.name; $("f-status").value = tr.dataset.status; $("f-sp3").value = "any"; $("f-sort").value = "flat";
+      SHOWN = 200; filter(); if (VIEW.length) show(0);
+      $("viewport").scrollIntoView({behavior: "smooth", block: "center"});
+    };
+  }
+  drawHists();
+}
+
+function drawHists() {
+  if (!DATA) return;
+  const H = DATA.summary.hist, bins = H.bins, thr = DATA.summary.threshold;
+  const W = 320, Hh = 150, L = 30, B = 26, T = 6, R = 8, pw = W - L - R, ph = Hh - B - T;
+  const x = (v) => L + pw * (v - bins[0]) / (bins[bins.length - 1] - bins[0]);
+  const ink = cssVar("--ink"), acc = cssVar("--accent"), fail = cssVar("--fail"), muted = cssVar("--muted"), line = cssVar("--line");
+  $("hists").innerHTML = H.families.map((f) => {
+    const dens = (c) => { const n = c.reduce((a, b) => a + b, 0) || 1; return c.map((v, i) => v / n / (bins[i + 1] - bins[i])); };
+    const g = dens(f.gen), r = f.n_ref ? dens(f.ref) : [];
+    const ymax = Math.max(...g, ...r, 1e-9) * 1.05, y = (v) => T + ph - ph * v / ymax;
+    const bars = g.map((v, i) => `<rect x="${x(bins[i]) + 0.5}" y="${y(v)}" width="${Math.max(x(bins[i + 1]) - x(bins[i]) - 1, 0.5)}" height="${T + ph - y(v)}" fill="${acc}" opacity="0.8"/>`).join("");
+    let step = "";
+    if (r.length) {
+      step = `M${x(bins[0])},${y(0)}` + r.map((v, i) => `L${x(bins[i])},${y(v)}L${x(bins[i + 1])},${y(v)}`).join("") + `L${x(bins[bins.length - 1])},${y(0)}`;
+    }
+    const ticks = [0, 0.2, 0.4, 0.6, 0.8].map((t) => `<text x="${x(t)}" y="${Hh - 10}" font-size="10" fill="${muted}" text-anchor="middle">${t}</text>`).join("");
+    return `<div><div class="t">${esc(f.label)} · n=${f.n_gen.toLocaleString()} gen / ${f.n_ref} crystal</div>
+      <svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${esc(f.label)}">
+        <line x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}" stroke="${line}"/>
+        ${bars}${step ? `<path d="${step}" fill="none" stroke="${ink}" stroke-width="1.5"/>` : ""}
+        <line x1="${x(thr)}" x2="${x(thr)}" y1="${T}" y2="${T + ph}" stroke="${fail}" stroke-dasharray="3 3"/>
+        ${ticks}<text x="${W - R}" y="${Hh - 0}" font-size="10" fill="${muted}" text-anchor="end">Å</text>
+      </svg></div>`;
+  }).join("");
+}
+
+function filter() {
+  const name = $("f-name").value, st = $("f-status").value, sp = $("f-sp3").value, so = $("f-sort").value;
+  VIEW = ROWS.filter((r) => (name === "*" || r.name === name) &&
+    (st === "any" || (st === "bad" ? (r.status === "fail" || r.status === "sign-dependent") : r.status === st)) &&
+    (sp === "any" || (sp === "sp3" ? r.n_sp2 === 0 : r.n_sp2 > 0)));
+  const rel = (r) => r.relaxed_max_abs_dev === null ? 9 : r.relaxed_max_abs_dev;
+  VIEW.sort(so === "flat" ? (a, b) => a.max_abs_dev - b.max_abs_dev :
+            so === "pucker" ? (a, b) => b.max_abs_dev - a.max_abs_dev :
+            so === "ffflat" ? (a, b) => rel(a) - rel(b) :
+            (a, b) => a.target.localeCompare(b.target) || a.k - b.k || a.ring - b.ring);
+  $("count").textContent = `${VIEW.length.toLocaleString()} rings match`;
+  CUR = -1;
+  renderList();
+}
+
+function renderList() {
+  const rows = VIEW.slice(0, SHOWN);
+  $("list").innerHTML = `<thead><tr><th>target #mol</th><th>ring</th><th>max|d|</th><th>MMFF</th><th>status</th></tr></thead><tbody>` +
+    rows.map((r, i) => `<tr class="click${i === CUR ? " sel" : ""}" data-i="${i}"><td>${r.target.replace("target_", "t")} #${r.k}</td>
+      <td title="${esc(r.core)}">${esc(r.name.length > 22 ? r.core : r.name)}</td><td>${fmt(r.max_abs_dev)}</td><td>${fmt(r.relaxed_max_abs_dev)}</td><td>${badge(r.status)}</td></tr>`).join("") +
+    "</tbody>" + (VIEW.length > SHOWN ? `<tfoot><tr><td colspan="5" style="padding:0"><button class="more" id="more">show ${Math.min(200, VIEW.length - SHOWN)} more</button></td></tr></tfoot>` : "");
+  for (const tr of document.querySelectorAll("#list tbody tr")) tr.onclick = () => show(+tr.dataset.i);
+  if ($("more")) $("more").onclick = () => { SHOWN += 200; renderList(); };
+}
+
+function renderJumps() {
+  const pick = (f) => ROWS.filter(f).sort((a, b) => a.max_abs_dev - b.max_abs_dev)[0];
+  const bad = (r) => r.status === "fail";
+  const counts = {};
+  for (const r of ROWS) if (bad(r)) counts[r.name] = (counts[r.name] || 0) + 1;
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  const cases = [
+    top && [`most common failure: ${top[0]}`, pick((r) => bad(r) && r.name === top[0])],
+    ["all-sp3 6-ring that fails", pick((r) => bad(r) && r.n_sp2 === 0)],
+    ["flattest all-sp3 cyclopentane (unchecked)", pick((r) => r.core === "C1CCCC1" && r.n_sp2 === 0)],
+    ["most puckered cyclopentane", ROWS.filter((r) => r.core === "C1CCCC1" && r.n_sp2 === 0).sort((a, b) => b.max_abs_dev - a.max_abs_dev)[0]],
+  ].filter(Boolean);
+  $("jump").innerHTML = `<span class="sub" style="width:100%">jump to:</span>` + cases.map(([t, r], i) =>
+    r ? `<button data-j="${i}">${esc(t)}</button>` : `<button disabled title="no such ring in this arm">${esc(t)} (none)</button>`).join("");
+  for (const b of document.querySelectorAll("#jump button[data-j]")) {
+    b.onclick = () => {
+      const r = cases[+b.dataset.j][1];
+      $("f-name").value = r.name; $("f-status").value = "any"; $("f-sp3").value = "any"; $("f-sort").value = "flat";
+      SHOWN = Math.max(200, 1); filter();
+      let i = VIEW.indexOf(r);
+      if (i >= SHOWN) { SHOWN = i + 1; renderList(); }
+      show(i);
+    };
+  }
+}
+
+function step(d) {
+  if (!VIEW.length) return;
+  const i = Math.min(Math.max(CUR + d, 0), VIEW.length - 1);
+  if (i >= SHOWN) { SHOWN = i + 1; renderList(); }
+  show(i);
+}
+
+function relaxedMolblock(molblock, xyz) {
+  const L = molblock.split("\n");
+  const n = parseInt(L[3].slice(0, 3), 10);
+  const f = (v) => v.toFixed(4).padStart(10);
+  for (let i = 0; i < n; i++) L[4 + i] = f(xyz[i][0]) + f(xyz[i][1]) + f(xyz[i][2]) + L[4 + i].slice(30);
+  return L.join("\n");
+}
+
+async function show(i, recenter = true) {
+  if (i < 0 || i >= VIEW.length) return;
+  CUR = i;
+  for (const tr of document.querySelectorAll("#list tbody tr")) tr.classList.toggle("sel", +tr.dataset.i === i);
+  const sel = document.querySelector("#list tbody tr.sel");
+  if (sel) sel.scrollIntoView({block: "nearest"});
+  const r = VIEW[i], token = ++loadToken;
+  writeHash({arm: ARM, t: r.target, k: r.k, r: r.ring});
+  let mol;
+  try { mol = await getJSON(`data/${ARM}/mols/${r.target}_${r.k}.json`); }
+  catch (e) { $("info").innerHTML = `<dt>error</dt><dd class="err">${esc(e.message)}</dd>`; return; }
+  if (token !== loadToken) return;
+  const ring = mol.rings[r.ring];
+  const orient = recenter ? null : stage.viewerControls.getOrientation();
+  stage.removeAllComponents();
+
+  const lig = await stage.loadFile(new Blob([mol.molblock], {type: "text/plain"}), {ext: "sdf", name: "generated"});
+  if (token !== loadToken) return;
+  const ringSele = "@" + ring.atoms.join(",");
+  lig.addRepresentation("ball+stick", {multipleBond: "symmetric", aspectRatio: 1.8});
+  lig.addRepresentation("ball+stick", {sele: ringSele, color: "#e03131", multipleBond: "symmetric", aspectRatio: 1.8, radiusScale: 1.25});
+
+  if ($("o-relax").checked && ring.relaxed_xyz) {
+    const rel = await stage.loadFile(new Blob([relaxedMolblock(mol.molblock, ring.relaxed_xyz)], {type: "text/plain"}), {ext: "sdf", name: "MMFF-relaxed"});
+    rel.addRepresentation("licorice", {color: "#8a8a8a", radiusType: "size", radiusSize: 0.09, opacity: 0.9, multipleBond: "off"});
+  }
+  if ($("o-pocket").checked && mol.pocket_sel !== "none") {
+    try {
+      const p = await stage.loadFile(`data/${ARM}/pockets/${r.target}.pdb`, {name: "pocket"});
+      p.addRepresentation("line", {sele: `(${mol.pocket_sel}) and not hydrogen`, color: isDark() ? "#7c8698" : "#9aa3b2", linewidth: 2});
+      p.addRepresentation("label", {sele: `(${mol.pocket_sel}) and .CA`, labelType: "format", labelFormat: "%(resname)s%(resno)s",
+        color: isDark() ? "#9aa3b2" : "#6b7383", radiusType: "size", radiusSize: 0.6, zOffset: 1});
+    } catch (e) { /* pocket is optional */ }
+  }
+  if (token !== loadToken) return;
+
+  const c = ring.centroid, n = ring.normal;
+  const X = ring.atoms.map((a) => lig.structure.getAtomProxy(a).positionToArray());
+  focus = [lig, ringSele];
+  if ($("o-plane").checked) {
+    // square through the centroid, spanned by u (towards the first ring atom, in-plane) and v = n × u
+    let u = X[0].map((v, k) => v - c[k]);
+    const un = u.reduce((a, v, k) => a + v * n[k], 0);
+    u = u.map((v, k) => v - un * n[k]);
+    const ul = Math.hypot(...u); u = u.map((v) => v / ul);
+    const v = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
+    const s = 1.15 * Math.max(...X.map((p) => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2])));
+    const P = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => c.map((ck, k) => ck + s * (a * u[k] + b * v[k])));
+    const pos = [...P[0], ...P[1], ...P[2], ...P[0], ...P[2], ...P[3]];
+    const pl = new NGL.Shape("plane");
+    pl.addMesh(pos, Array(18).fill(0).map((_, j) => [0.95, 0.75, 0.2][j % 3]));
+    stage.addComponentFromObject(pl).addRepresentation("buffer", {opacity: 0.35, side: "double", depthWrite: false});
+    const ar = new NGL.Shape("normal");
+    ar.addArrow(c, c.map((ck, k) => ck + 1.3 * n[k]), [0.95, 0.6, 0.1], 0.07);
+    stage.addComponentFromObject(ar).addRepresentation("buffer");
+  }
+  if ($("o-labels").checked) {
+    const tx = new NGL.Shape("distances");
+    const col = isDark() ? [0.95, 0.95, 0.95] : [0.1, 0.1, 0.1];
+    ring.atoms.forEach((a, j) => {
+      const d = ring.d[j], sgn = d >= 0 ? 1 : -1;
+      tx.addText(X[j].map((p, k) => p + 0.45 * sgn * n[k]), col, 0.9, (d >= 0 ? "+" : "") + d.toFixed(3));
+    });
+    stage.addComponentFromObject(tx).addRepresentation("buffer");
+  }
+  if (orient) stage.viewerControls.orient(orient); else lig.autoView(ringSele, 0);
+
+  const pbs = ring.d.length ? [Math.max(...ring.d), Math.max(...ring.d.map((x) => -x))] : [null, null];
+  $("info").innerHTML = [
+    ["molecule", `${r.target} · #${r.k} · ${r.n_atoms} heavy atoms`],
+    ["ring", `${esc(r.name)} <code>${esc(r.core)}</code> · ${r.size}-ring · ${r.n_sp2} sp2 atom(s) ${badge(r.status)}`],
+    ["max |d| (generated)", `${fmt(r.max_abs_dev)} Å`],
+    ["PoseBusters value", `${fmt(pbs[0])} or ${fmt(pbs[1])} Å, depending on the normal's sign (threshold ${DATA.summary.threshold} Å)`],
+    ["max |d| after MMFF", ring.relaxed_max_abs_dev === null ? "relaxation failed" : `${fmt(ring.relaxed_max_abs_dev)} Å ${ring.relaxed_max_abs_dev < DATA.summary.threshold ? "(force field also keeps it flat)" : "(force field puckers it)"}`],
+    ["stored PB verdict", r.pb_metrics === null ? "–" : (r.pb_metrics ? "pass" : "fail") + " (whole molecule, metrics.json)"],
+    ["SMILES", `<code>${esc(mol.smiles)}</code>`],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+
+init().catch((e) => { document.querySelector("main").insertAdjacentHTML("afterbegin", `<div class="card err">Failed to load: ${esc(e.message)}. Build the site first: build_ring_nonflatness_site.py</div>`); });
+</script>
+</body>
+</html>

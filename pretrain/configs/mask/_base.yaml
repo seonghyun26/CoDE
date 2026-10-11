@@ -1,0 +1,14 @@
+# @package mae
+# Knobs every masking option shares. Not a standalone choice (leading _).
+block_size: 8                  # masked cube edge, in voxels
+# Variable ratio (R2MAE): when max > min, each training batch draws r ~ U[min, max]; val stays fixed.
+mask_ratio_min: null
+mask_ratio_max: null
+# Curriculum: ramp the per-epoch ratio min -> max over mask_curriculum_epochs (null = num_epochs).
+# mask_curriculum_steps null = linear, N >= 2 = N held levels. Takes precedence over R2MAE.
+mask_curriculum: false
+mask_curriculum_epochs: null
+mask_curriculum_steps: null
+# Mask each ChannelViT group independently, at mask_group_ratios (aligned to model.channel_groups).
+mask_channel_independent: false
+mask_group_ratios: null

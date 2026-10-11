@@ -1,0 +1,5 @@
+# Table 2 "CoE + D recon.": atom channels in (groups [7,4]), all 13 channels reconstructed, so density
+# and gradmag are only targets. The live trainer dropped this input option, hence trainer: legacy.
+name: 261009_ab7v2p1_clean_coe_drecon
+pretrain: {experiment: ab7v2p1_clean_coe_drecon, trainer: legacy, gpus: 0-3, overrides: [bsz=8, accum_steps=4]}
+evaluate: {condition: atomblob, gpu: 0}

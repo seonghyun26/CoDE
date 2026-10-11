@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Downstream · Pocket visualizer</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f5f3;color:#22252b;font:14px/1.5 system-ui,sans-serif}
+    header{max-width:1460px;margin:auto;padding:28px 28px 18px}h1{font-size:25px;letter-spacing:-.6px;margin:0 0 5px}p{margin:0;color:#72757d}
+    main{max-width:1460px;margin:auto;padding:0 28px 32px;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    .panel{background:white;border:1px solid #e2e3e5;border-radius:14px;overflow:hidden;min-width:0}
+    .heading{padding:20px 22px 14px}h2{font-size:18px;margin:0}.eyebrow{font-size:11px;letter-spacing:1.3px;color:#7588bd;margin-bottom:5px}
+    .scene{width:100%;aspect-ratio:1;background:white;position:relative}.controls{padding:18px 22px;border-top:1px solid #edeef1}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.row:last-child{margin-bottom:0}
+    label{display:flex;align-items:center;gap:7px}label.field{flex:1;display:grid;gap:5px;font-size:12px;color:#666b75;min-width:120px}
+    select,button,input{font:inherit}select{width:100%;min-width:0;background:#fafafa;border:1px solid #dadde2;border-radius:7px;padding:7px;color:#252935}
+    button{border:1px solid #daddE5;background:white;border-radius:7px;padding:8px 12px;cursor:pointer}button:hover{background:#f1f3f8}button.primary{background:#3c5fdf;color:white;border-color:#3c5fdf}button:disabled{opacity:.45;cursor:wait}
+    input[type=color]{width:28px;height:27px;border:0;padding:0;background:none;cursor:pointer}input[type=range]{width:92px;accent-color:#3c5fdf}input[type=checkbox]{accent-color:#3c5fdf}
+    .status{padding:0 22px 18px;min-height:40px;font-size:12px;color:#6b7280;overflow-wrap:anywhere}.status.error{color:#b23a3a}.status a{color:#3c5fdf}details{border-top:1px solid #eee;padding-top:10px;margin-top:12px}summary{cursor:pointer;color:#72757d;font-size:12px;margin-bottom:10px}
+    @media(max-width:850px){main{grid-template-columns:1fr;padding:0 14px 20px}header{padding:20px 14px}}
+  </style>
+</head>
+<body>
+<header><h1>Downstream pocket visualizer</h1><p>드래그로 회전 · 스크롤로 확대 · 오른쪽 드래그로 이동 · 투명 PNG로 그림에 붙여 넣기</p></header>
+<main id="panels"></main>
+<template id="panel-template">
+  <section class="panel">
+    <div class="heading"><div class="eyebrow"></div><h2></h2></div>
+    <div class="scene" aria-label="Interactive pocket structure"></div>
+    <div class="controls">
+      <div class="row">
+        <label class="field">Pocket<select data-control="target"></select></label>
+        <label class="field">Molecule<select data-control="molecule"></select></label>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" data-control="surface" checked>Surface</label>
+        <label><input type="checkbox" data-control="sticks" checked>Pocket sticks</label>
+        <label><input type="checkbox" data-control="cartoon" checked>Cartoon</label>
+        <label><input type="checkbox" data-control="ligand" checked>Molecule</label>
+      </div>
+      <div class="row">
+        <label>Surface<input type="color" data-control="pocket-color" value="#FFFFFF"></label>
+        <label>Pocket sticks<input type="color" data-control="pocket-stick-color" value="#B8BDC5"></label>
+        <label>Ligand carbon<input type="color" data-control="ligand-color" value="#9EA3AA"></label>
+        <label>Opacity<input aria-label="Pocket opacity" type="range" data-control="opacity" min="0.05" max="1" step="0.05" value="0.15"></label>
+      </div>
+      <div class="row">
+        <button data-action="reset">Reset view</button><button data-action="remember">Remember view</button>
+        <button data-action="save" class="primary">Save PNG + PDF</button>
+      </div>
+      <details><summary>More controls</summary><div class="row">
+        <label class="field">Pocket distance<select data-control="radius"><option value="5">5 Å</option><option value="7" selected>7 Å</option><option value="10">10 Å</option></select></label>
+        <label class="field">Export size<select data-control="size"><option>1200</option><option selected>1800</option><option>2400</option></select></label>
+        <label class="field">Molecule style<select data-control="style"><option value="ball+stick">Ball & stick</option><option value="licorice" selected>Sticks</option><option value="spacefill">Space filling</option></select></label>
+      </div><div class="row"><label><input type="checkbox" data-control="elements" checked>Color heteroatoms by element</label><button data-action="pocket-only">Pocket only</button><button data-action="complex">Pocket + molecule</button></div></details>
+    </div>
+    <div class="status" role="status">Loading…</div>
+  </section>
+</template>
+<script src="/ngl.js"></script><script src="/pocket.js"></script>
+</body></html>

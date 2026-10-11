@@ -1,0 +1,8 @@
+# @package mae
+# Blocks ranked by atom mass plus noise (tau scales the noise). The CDG_v2 champion, at 0.75.
+defaults:
+  - _base
+  - _self_
+mask_strategy: atom_biased
+mask_ratio: 0.75
+mask_atom_tau: 1.0

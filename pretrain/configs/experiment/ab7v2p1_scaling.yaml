@@ -1,0 +1,17 @@
+# @package _global_
+# Scaling ablation on the ab7v2p1 recipe (ab7v2p1_cdg): pick model=tiny|small|medium and a data
+# fraction with dset.subset_n. ab7v2p1's own box data is on another server only, so this uses
+# CoDE_pretrain_v1, the same PLINDER v2 family with the CL3 test proteins removed.
+defaults:
+  - override /dset: CoDE_pretrain_v1
+  - override /model: small
+  - override /mae: invfreq
+  - override /mask: uniform
+
+exp_name: ab7v2p1_scaling
+wandb_tags: [pretrain, scaling, ab7v2p1, CoDE_pretrain_v1]
+bsz: 32
+accum_steps: 1
+model:
+  channel_groups: [7, 4, 1, 1]
+mae: {channel_weighting: uniform, channel_weight_clip_ratio: 0.0, val_every: 1}

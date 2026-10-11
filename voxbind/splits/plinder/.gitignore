@@ -1,0 +1,9 @@
+# repo-wide .gitignore drops *.csv/*.json everywhere; the frozen PLINDER selection
+# in THIS dir is source-of-truth and must be tracked.
+!*.csv
+!*.json
+!*.md
+!.gitignore
+
+# A selection that is CoDE_pretrain_v1's minus the tracked removed list; 02_make_clean_corpus.py rebuilds it.
+CoDE_pretrain_v1_ID*/plinder_selected.csv

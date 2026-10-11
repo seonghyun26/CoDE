@@ -1,0 +1,138 @@
+{
+  "name": "cdgv2_clean",
+  "description": "cdgv2 with the proteins of FULL + CL3 + CL3-ID60 + CL3-ID30 + CASF-nontrain + CASF-clean + CrossDocked-test removed (identity >= 100%).",
+  "plinder_bucket": "gs://plinder/2024-06/v2",
+  "selection_csv": "plinder_selected.csv",
+  "selection_sha256": "65c378ed6c7d459c97da98ae702fb4700da8809435b5a5d1e958c7d7b064a109",
+  "n_selected": 108732,
+  "filters": {
+    "min_rscc": 0.8,
+    "max_res": 0,
+    "min_heavy": 6,
+    "max_heavy": 50,
+    "single_ligand": false,
+    "allow_covalent": false,
+    "plinder_splits": [],
+    "dedup": "none",
+    "in_vocab_filter": false,
+    "paper7_id100_decontamination": {
+      "cohorts": [
+        "FULL",
+        "CL3",
+        "CL3-ID60",
+        "CL3-ID30",
+        "CASF-nontrain",
+        "CASF-clean",
+        "CrossDocked-test"
+      ],
+      "identity_min_percent": 100.0,
+      "shorter_sequence_coverage_min_percent": 80.0,
+      "policy": "drop every ligand observation from a PDB with a qualifying protein-chain hit into a selected cohort, or that is a cohort entry itself",
+      "removed_unique_pdb": 2607,
+      "removed_manifest_positions": 5217
+    }
+  },
+  "build": {
+    "shuffle_seed": 1234,
+    "val_tail": 100,
+    "max_len": 30,
+    "norm_version": "v6_arcsinh_z",
+    "pocket_radius": 10.0,
+    "frame": "deposited (transform=None)"
+  },
+  "leakage_holdout": {
+    "pdbbind_index_csv": {
+      "path": "dataset/data/pdbbind/index.csv",
+      "sha256": "cec303f95411b6acfc22fc6fbd58b89118b84f2625547d8bed7dc6fff79303e9"
+    },
+    "misato_pool_pids": {
+      "path": "dataset/data/misato/pool_pids.txt",
+      "sha256": "a76bf32fd8f0b90b4c626ff0ba650e3ee0ae54c9085e1ad408141d079b9d2d72"
+    },
+    "crossdocked_test_pt": {
+      "path": "dataset/data/data_test.pt",
+      "sha256": "24579bc2725b0b80b3a0e65fef649baab9e34fbb3f79ce92c0c4a5b1a9c2d2e8"
+    },
+    "full": {
+      "label": "FULL",
+      "sources": [
+        {
+          "split": "lp_edrscc_v2",
+          "partition": "test"
+        }
+      ]
+    },
+    "cl3": {
+      "label": "CL3",
+      "sources": [
+        {
+          "split": "lp_edrscc_v2_cl123",
+          "partition": "test"
+        }
+      ]
+    },
+    "cl3_id60": {
+      "label": "CL3-ID60",
+      "sources": [
+        {
+          "path": "voxbind/splits/cl123_test_novel60_cohort.csv",
+          "sha256": "07c95d691a99ef0ff2255d0dc005b82e17d2849796fd0c2bdaf3cc4f2998c499"
+        }
+      ]
+    },
+    "cl3_id30": {
+      "label": "CL3-ID30",
+      "sources": [
+        {
+          "path": "voxbind/splits/cl123_test_novel30_cohort.csv",
+          "sha256": "e623946e0aa15aea0223c53a61b7942dcbb669cfe82e5a126bdbbdfd944d1fac"
+        }
+      ]
+    },
+    "casf_nontrain": {
+      "label": "CASF-nontrain",
+      "sources": [
+        {
+          "path": "voxbind/splits/casf2016_nontrain_cohort.csv",
+          "sha256": "b1ba12716a630d5fc2c66e801ce939be19d293ec9d6595b6190c4c79f14afb6c"
+        }
+      ]
+    },
+    "casf_clean": {
+      "label": "CASF-clean",
+      "sources": [
+        {
+          "path": "voxbind/splits/casf2016_clean_cohort.csv",
+          "sha256": "69f5791e1b8ad890c2eb7f2124e8003366343f7cd583d44f23eb44d8907f6992"
+        }
+      ]
+    },
+    "crossdocked_test": {
+      "label": "CrossDocked-test",
+      "sources": [
+        {
+          "path": "dataset/data/data_test.pt",
+          "sha256": "24579bc2725b0b80b3a0e65fef649baab9e34fbb3f79ce92c0c4a5b1a9c2d2e8"
+        },
+        {
+          "path": "voxbind/splits/crossdocked_test_receptors.fasta",
+          "sha256": "6212b28bd47b702402a185bb3d64b9e780e59f0b481a71a9905d1cbcfd736a97"
+        }
+      ]
+    },
+    "plinder_v2_chain_fasta": {
+      "path": "dataset/data/plinder/plinder_v2_pretrain.fasta",
+      "sha256": "967c104d2b53d2bb41f3a163e8d792b17783d3ac2855badc540db8353fb2e68d"
+    }
+  },
+  "note": "cdgv2_clean reuses the cdgv2 tuples and the position-aligned density box; the manifest availability mask is the authoritative load-time filter.",
+  "source_version": "cdgv2",
+  "materialized_loader": {
+    "source_manifest_positions": 112733,
+    "retained_manifest_positions": 107516,
+    "subset_n": 107416,
+    "subset_val_n": 100,
+    "source_data_file": "dataset/data/pretrain/data_train_plinder_v2_perelem.pt",
+    "resample_dir": "dataset/data/pretrain/xray_resample_cdgv2_clean"
+  }
+}

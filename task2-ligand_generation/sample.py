@@ -1,0 +1,91 @@
+import logging
+import os
+import time
+import torch
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
+from voxbind.voxelizer import Voxelizer
+from voxbind.models import create_model
+from voxbind.utils.base_utils import load_checkpoint, seed_everything
+from voxbind.utils.sampling_utils import sample_molecules
+from dataset import create_sampling_dataloader
+
+logger = logging.getLogger("sampling")
+
+
+@hydra.main(config_path="configs/", config_name="config_sample", version_base=None)
+def main(cfg: DictConfig) -> None:
+    # -----------------------------------------------------------
+    # basic inits
+    assert cfg.wjs.chain_init in ["denovo", "ligand"]
+    assert torch.cuda.is_available(), "not a good idea to sample on cpu..."
+    logger.info(f"n gpus available: {torch.cuda.device_count()}")
+    logger.info(f"saving in dirname: {cfg.save_dir}")
+    torch.set_default_dtype(torch.float32)
+    seed_everything(cfg.seed)
+
+    # ----------------------
+    # model, voxelizer, loader
+    cfg_model = OmegaConf.structured(OmegaConf.load(os.path.join(cfg.pretrained_path, "cfg.yaml")))
+    cfg = OmegaConf.merge(cfg_model, cfg)
+    device = torch.device("cuda:0")
+    model = create_model(cfg)
+    model.to(device)
+    model, n_epochs = load_checkpoint(model, cfg.pretrained_path, best_model=False)
+    logger.info(f"model trained for {n_epochs} epochs")
+
+    voxelizer = Voxelizer(
+        grid_dim=cfg.vox.grid_dim,
+        resolution=cfg.vox.resolution,
+        cubes_around=cfg.vox.cubes_around,
+        device=device,
+    )
+
+    loader = create_sampling_dataloader(cfg, split=cfg.wjs.split)
+    logger.info(f"test set size: {len(loader.dataset.data)}")
+
+    # ----------------------
+    # start sampling
+    logger.info("start sampling...")
+    model.eval()
+
+    for pocket_id, batch in enumerate(loader):
+        if pocket_id < cfg.wjs.start:
+            continue
+        if pocket_id > cfg.wjs.end:
+            break
+        # generate samples
+        pocket, ligand_gt = batch["pocket"], batch["ligand"]
+        # X-ray density conditioning. When the model has the density branch,
+        # feed this pocket's X-ray density map. Pockets without a map are
+        # skipped, so every sampled pocket is genuinely density-conditioned.
+        density = None
+        with_density = cfg.model.get("with_density", False)
+        with_gradmag = bool(cfg.get("with_gradmag", False))
+        if with_density and "xray_density" in batch:
+            avail = batch.get("xray_available")
+            if avail is None or bool(avail.flatten()[0].item()):
+                density = batch["xray_density"]
+                if with_gradmag and "xray_gradmag" in batch:
+                    # (1, 2, G, G, G) = [density, gradmag]; sample_molecules sees
+                    # dim==5 and feeds it through to the 2-ch density branch as-is.
+                    density = torch.stack(
+                        [batch["xray_density"], batch["xray_gradmag"]], dim=1
+                    )
+        if with_density and density is None:
+            logger.info(f"| pocket {pocket_id}: no x-ray density -> skipped")
+            continue
+
+        logger.info(f"| sampling pocket {pocket_id}")
+        target_dirname = os.path.join(cfg.save_dir, f"target_{pocket_id:02d}")
+        t0 = time.time()
+        sample_molecules(model, pocket, ligand_gt, voxelizer, target_dirname, cfg, density=density)
+        logger.info(f"| sampling took {(time.time() - t0):.2f}s")
+
+        if pocket_id == cfg.wjs.n_targets:
+            break
+
+
+if __name__ == "__main__":
+    main()

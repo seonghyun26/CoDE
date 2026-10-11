@@ -1,0 +1,5 @@
+# build output -- rebuilt by build.py, published by deploy_space.sh
+site/
+__pycache__/
+# serve.sh --https self-signed cert: holds a private key
+.dev-cert.pem

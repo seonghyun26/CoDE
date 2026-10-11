@@ -1,0 +1,5 @@
+# Table 2 "w.o. G channel": atoms and density, groups [7,4,1]. Recipe and evaluation as in
+# ab7v2p1_clean.yaml.
+name: 261009_ab7v2p1_clean_nograd
+pretrain: {experiment: ab7v2p1_clean_nograd, gpus: 0-3, overrides: [bsz=8, accum_steps=4]}
+evaluate: {condition: atomblob_density, gpu: 0}

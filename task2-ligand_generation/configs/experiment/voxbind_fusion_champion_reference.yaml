@@ -1,0 +1,30 @@
+# @package _global_
+# Migrated from config_train_voxbind_fusion_champion_reference.yaml; verify_parity.py: resolves identically.
+defaults:
+  - override /dset: crossdocked_xray
+  - override /model: voxbind
+  - override /vox: default
+  - override /wjs: training
+
+exp_name: voxbind_fusion_champion_reference
+wandb_tags: [voxbind, fusion, champion, reference, ligand_conditioned]
+pretrained_path: exps/exp_sig0.9_v2/checkpoint.pth.tar
+num_epochs: 100
+bsz: 32
+dset: {subset_n: 78512, subset_xray_only: true,
+  subset_val_n: 100}
+model:
+  with_density: true
+  density_encoder_type: vit
+  density_vit:
+    dim: 640
+    depth: 18
+    heads: 10
+    n_in_channels: 13
+    patch_embed_mode: channel_group
+    channel_groups: [7, 4, 2]
+  density_pretrained_path: ../model_zoo/champion_100m_v2_mask075/checkpoint_e0049.pth.tar
+  density_freeze: true
+  density_encoder_sees_ligand: true
+  density_encoder_amp: true
+wjs: {n_targets: 0}

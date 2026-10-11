@@ -1,0 +1,123 @@
+# syntax=docker/dockerfile:1.6
+#
+# FuncBind + VoxBind CDG image for the SBintuitions cluster.
+#
+# This image extends the already-built VoxBind SB image. It keeps VoxBind's
+# three environments intact and adds a separate `funcbind` environment because
+# FuncBind's Python/Torch/CUDA dependency set is not compatible with the
+# VoxBind environment.
+#
+# The FuncBind source is the `FuncBind` submodule of this repository. Build from
+# the VoxBind repository root after initializing submodules:
+#
+#   git submodule update --init --recursive FuncBind
+#   docker build --network=host \
+#     -f script/dockerfile-funcbind.sbint \
+#     --build-arg VOXBIND_BASE=voxbind:allinone \
+#     -t voxbind-funcbind:sb .
+#
+# Data and checkpoints are intentionally not baked into the image. Mount them
+# at runtime, for example:
+#
+#   docker run --rm -it --gpus all --shm-size=32g \
+#     -e MCP_MODEL_URL='https://<host>/.../checkpoint.pth.tar' \
+#     -v /path/to/funcbind-data:/workspace/FuncBind/funcbind/dataset/data \
+#     -v /path/to/funcbind-exps:/workspace/FuncBind/exps \
+#     -v /path/to/funcbind-artifacts:/workspace/FuncBind/artifacts \
+#     -v /path/to/voxbind-pretrain-exps:/workspace/VoxBind/pretrain/exps \
+#     voxbind-funcbind:sb
+#
+# The exps mount is /workspace/FuncBind/exps, NOT .../funcbind/exps: `exp_dir` in the
+# training configs is `exps/funcbind` relative to the working directory, so runs land in
+# /workspace/FuncBind/exps/funcbind/<exp_name>. FUNCBIND_EXP_DIR (set below) overrides it
+# if you would rather mount somewhere else. Either way the two must agree, or a run writes
+# its checkpoints into the container layer and resume silently starts from scratch.
+#
+# FuncBind/scripts/00_link_or_fetch_paths.sh links or fetches both trees at runtime:
+#   FB_SRC_ROOT=/mnt/staged bash scripts/00_link_or_fetch_paths.sh
+
+ARG VOXBIND_BASE=voxbind:allinone
+FROM ${VOXBIND_BASE}
+
+# The micromamba entrypoint activates this environment for interactive runs.
+ENV ENV_NAME=funcbind
+
+# Create FuncBind's independent environment. ANARCI is installed through
+# bioconda as prescribed by FuncBind; the remaining dependencies come from the
+# repository's pinned requirements file.
+# cxx-compiler is not optional: the training config asks for torch.compile
+# (performance.compile_backend: inductor), and without a C++ compiler inductor raises
+# InvalidCxxCompiler and the run DIES -- it does not fall back to eager. The team measured
+# compiled at 1.20x eager on the 5.14B denoiser (16.42 vs 13.66 samples/s), so this is both
+# a correctness and a throughput fix. The ENV below points inductor at this named env's
+# compiler; a compatibility .repro-env symlink is created after the source installation.
+RUN micromamba create -y -n funcbind -c conda-forge -c bioconda \
+        python=3.12.9 anarci pip cxx-compiler curl \
+ && micromamba clean --all --yes
+
+# Install the large, stable dependency layer before copying source. The first
+# line in requirements.txt is `-e .`; remove only that line here and install the
+# project itself after COPY below.
+COPY --chown=$MAMBA_USER:$MAMBA_USER FuncBind/requirements.txt /tmp/funcbind.requirements.txt
+RUN sed '/^-e[[:space:]]\+\.$/d' /tmp/funcbind.requirements.txt > /tmp/funcbind.dependencies.txt \
+ && micromamba run -n funcbind python -m pip install --no-cache-dir \
+        -r /tmp/funcbind.dependencies.txt \
+ && micromamba clean --all --yes \
+ && rm -f /tmp/funcbind.requirements.txt /tmp/funcbind.dependencies.txt
+
+# /workspace was created by the parent image and is root-owned. Prepare a
+# writable project directory before COPY and editable installation.
+USER root
+RUN mkdir -p /workspace/FuncBind /workspace/VoxBind \
+ && chown $MAMBA_USER:$MAMBA_USER /workspace/FuncBind /workspace/VoxBind
+USER $MAMBA_USER
+
+# Ship the current CDG/voxelizer implementation even when the base image has an
+# older VoxBind checkout or uses a different source path. Copy only the runtime
+# modules: the broader VoxBind tree can also contain large local test artifacts.
+COPY --chown=$MAMBA_USER:$MAMBA_USER voxbind/__init__.py voxbind/constants.py voxbind/voxelizer.py /workspace/VoxBind/voxbind/
+COPY --chown=$MAMBA_USER:$MAMBA_USER voxbind/models/ /workspace/VoxBind/voxbind/models/
+COPY --chown=$MAMBA_USER:$MAMBA_USER FuncBind/ /workspace/FuncBind/
+WORKDIR /workspace/FuncBind
+RUN micromamba run -n funcbind python -m pip install --no-cache-dir --no-deps -e . \
+ && micromamba run -n funcbind python -m pip check
+# Repository launchers consistently use .repro-env/bin/python. Keep that interface in
+# the image while the actual environment remains the named micromamba env.
+RUN ln -s /opt/conda/envs/funcbind /workspace/FuncBind/.repro-env
+
+# FUNCBIND_ROOT / VOXBIND_PYTHON_ROOT / FUNCBIND_EXP_DIR are read by FuncBind's configs
+# themselves (`${oc.env:VAR,<host default>}`), so the absolute paths the
+# configs carry for the origin box resolve to this image's layout with no config edits.
+# CC/CXX point inductor at the env's toolchain (see the cxx-compiler note above).
+ENV FUNCBIND_ROOT=/workspace/FuncBind \
+    VOXBIND_ROOT=/workspace/VoxBind \
+    VOXBIND_PYTHON_ROOT=/workspace/VoxBind \
+    FUNCBIND_DENSITY_ENCODER=/workspace/VoxBind/pretrain/exps/260806_cdg_100m_v2_ep100/checkpoint_e0025.pth.tar \
+    FUNCBIND_EXP_DIR=/workspace/FuncBind/exps/funcbind \
+    CC=/opt/conda/envs/funcbind/bin/x86_64-conda-linux-gnu-gcc \
+    CXX=/opt/conda/envs/funcbind/bin/x86_64-conda-linux-gnu-g++ \
+    PY=/opt/conda/envs/funcbind/bin/python \
+    PYTHON_BIN=/opt/conda/envs/funcbind/bin/python \
+    PYTHONPATH=/workspace/FuncBind:/workspace/VoxBind \
+    PYTHONUNBUFFERED=1 \
+    MPLBACKEND=Agg
+
+# Verify the cross-repository imports without a GPU, host source mount, or model
+# checkpoint. This also catches a stale/missing VoxBind module during SB builds.
+RUN micromamba run -n funcbind python -c \
+    "from voxbind.models.density_vit import DensityViT; from voxbind.voxelizer import Voxelizer; from funcbind.models.density_condition import DensityCondition"
+
+# Test the shipped H100 recipe during the source-only rebuild, not a host venv.
+RUN OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+    micromamba run -n funcbind python -m pytest -q -p no:cacheprovider \
+      tests/test_h100_bf16_training_mode.py tests/test_h100_memory.py
+
+# The cluster/container UID may differ from MAMBA_USER. Source is read-only to
+# other users; data, checkpoints, and outputs remain separate runtime mounts.
+RUN chmod -R a+rX /workspace/FuncBind /workspace/VoxBind/voxbind/models \
+ && chmod a+rx /workspace/VoxBind /workspace/VoxBind/voxbind \
+ && chmod a+r /workspace/VoxBind/voxbind/__init__.py \
+              /workspace/VoxBind/voxbind/constants.py \
+              /workspace/VoxBind/voxbind/voxelizer.py
+
+CMD ["bash"]

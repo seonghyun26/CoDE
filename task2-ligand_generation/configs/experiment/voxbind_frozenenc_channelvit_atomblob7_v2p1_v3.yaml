@@ -1,0 +1,28 @@
+# @package _global_
+# Migrated from config_train_voxbind_frozenenc_channelvit_atomblob7_v2p1_v3.yaml; verify_parity.py: resolves identically.
+defaults:
+  - override /dset: crossdocked_xray
+  - override /model: voxbind
+  - override /vox: default
+  - override /wjs: training
+
+exp_name: voxbind_frozenenc_atomblob7_v2p1_v3_sig${smooth_sigma}
+wandb_tags: [voxbind, density_cond, frozen_encoder, channelvit, plinder, atomblob7, v2p1, cdg, full13_ligmasked,
+  leak_removal, density_mask_ligand, fusion_v3, pocket_replaced]
+bsz: 32
+dset: {subset_xray_only: true}
+model:
+  with_density: true
+  density_encoder_type: vit
+  density_vit:
+    dim: 512
+    depth: 12
+    heads: 8
+    n_in_channels: 13
+    patch_embed_mode: channel_group
+    channel_groups: [7, 4, 1, 1]
+  density_pretrained_path: ../pretrain/exps/260701_plinder_v2p1_box_atomblob7_cdg_channelvit_full_pretrain/checkpoint_e0099.pth.tar
+  density_freeze: true
+  density_mask_ligand: true
+  fusion: encoder_replace        # legacy name: v3
+  with_gradmag: false

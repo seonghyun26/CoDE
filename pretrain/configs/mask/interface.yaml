@@ -1,0 +1,8 @@
+# @package mae
+# Blocks where ligand and pocket atoms touch, first. model_zoo/interface_100m_v2_e40, at 0.75.
+defaults:
+  - _base
+  - _self_
+mask_strategy: interface
+mask_ratio: 0.75
+mask_atom_tau: 1.0

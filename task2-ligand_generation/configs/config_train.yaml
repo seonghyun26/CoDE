@@ -1,0 +1,44 @@
+defaults:
+  - dset: crossdocked
+  - model: voxbind
+  - vox: default
+  - wjs: training
+  - override hydra/job_logging: custom
+  - _self_
+
+debug: False
+wandb: True
+wandb_tags: []          # list of strings, e.g. [voxbind, 10k, density_mae, frozen_encoder]
+num_workers: 4
+resume: null
+resume_epoch: null  # if set, overrides the epoch loaded from checkpoint (useful when resuming)
+exp_dir: exps
+exp_name: exp_sig${smooth_sigma}${hydra.job.override_dirname}
+output_dir: null
+
+seed: 42
+num_epochs: 350
+aug: True  # use data augmentation
+bsz: 64  # batch size
+accum_steps: 1  # gradient-accumulation micro-batches per optimizer step (1 = off)
+ddp_static_graph: False  # train_ddp.py only: let DDP record the unused-param set once instead
+                         # of re-traversing the graph every step (find_unused_parameters).
+                         # Same gradients; ignored when accum_steps>1 (needs no_sync).
+lr: 1e-5
+wd: 1e-2
+smooth_sigma: .9
+
+# set the running dir
+hydra:
+  run:
+    dir: ./${exp_dir}/${exp_name}
+  job:
+    config:
+      override_dirname:
+        kv_sep: ""
+        item_sep: "_"
+        exclude_keys: [
+            "exp_dir", "smooth_sigma", "lr", vox.grid_dim, "wd", "resume", "resume_epoch", "wandb",
+            "num_workers", "exp_name", "output_dir", "pretrained_path", "out_dir",
+            "bsz", "accum_steps", "seed", "num_epochs", "aug", "pocket_radius", "grid_dim", "aug"
+]

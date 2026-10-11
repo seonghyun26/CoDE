@@ -1,0 +1,16 @@
+# @package _global_
+# Scaling ablation on the CDG v2 recipe (cdg_v2_champion): atom-biased mask 0.75, inverse-frequency
+# channel weights, channel groups [7,4,2]. Same grid as ab7v2p1_scaling, which differs only in the
+# recipe: pick model=tiny|small|medium and a data fraction with dset.subset_n. CoDE_pretrain_v1 keeps the
+# two grids on the same complexes. bsz 32 matches the champion's effective batch (4 x 8).
+defaults:
+  - override /dset: CoDE_pretrain_v1
+  - override /model: small
+  - override /mae: invfreq
+  - override /mask: atom_biased
+
+exp_name: cdg_v2_scaling
+wandb_tags: [pretrain, scaling, cdg_v2, CoDE_pretrain_v1]
+bsz: 32
+accum_steps: 1
+mae: {val_every: 1}

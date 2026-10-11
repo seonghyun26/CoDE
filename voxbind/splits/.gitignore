@@ -1,0 +1,12 @@
+# The repo-wide .gitignore drops *.csv and *.json everywhere. Split manifests in
+# THIS directory are source-of-truth artifacts and must be tracked, so re-include
+# them. (No parent dir is excluded — only file patterns — so negation is valid.)
+!*.csv
+!MANIFEST.json
+!atom3d_lba_v22clean_audit.json
+!.gitignore
+# CleanSplit (GEMS) reference inputs + filtering scripts (define clean_ed_* schemes)
+!cleansplit_ref/
+!cleansplit_ref/*.json
+!cleansplit_ref/*.py
+!cleansplit_ref/*.md

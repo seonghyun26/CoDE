@@ -1,0 +1,18 @@
+# @package _global_
+# The atomblob7 v2.1 encoder (model_zoo/atomblob7_v2p1_cdg_cvit_e99), trained on another server.
+defaults:
+  - override /dset: ab7v2p1
+  - override /model: v1
+  - override /mae: invfreq
+  - override /mask: uniform
+
+exp_name: 260701_plinder_v2p1_box_atomblob7_cdg_channelvit_full_pretrain
+wandb_tags: [pretrain, atomblob7, v2p1, density_gradmag, 40m, plinder, full, box96, cdg, channelvit]
+bsz: 32
+accum_steps: 1
+model:
+  model_name: atomblob_density_vit_mae_40m
+  channel_groups: [7, 4, 1, 1]
+  n_channels_ligand: 7
+  n_channels_pocket: 4
+mae: {channel_weighting: uniform, val_every: 5, ckpt_every: 20, channel_weight_clip_ratio: 0.0}

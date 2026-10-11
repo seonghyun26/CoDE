@@ -1,0 +1,6 @@
+# Objective: every atom-type reconstruction channel weighted equally. The matched control for
+# invfreq; on PLINDER invfreq > uniform, on CrossDocked v7 they tie.
+defaults:
+  - _base
+  - _self_
+channel_weighting: uniform

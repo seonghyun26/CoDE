@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VoxBind · Overview visualizer</title>
+  <style>
+    :root {color-scheme:light; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#242331; background:#f6f6f9;}
+    * {box-sizing:border-box} body {margin:0} button,input,select {font:inherit}
+    button,select {cursor:pointer} button:disabled,input:disabled,select:disabled {cursor:wait; opacity:.5}
+    button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible {outline:3px solid #88BFDA; outline-offset:3px}
+    header {max-width:1180px; margin:auto; padding:30px 24px 24px; display:flex; justify-content:space-between; align-items:center; gap:20px}
+    .eyebrow {font-size:11px; font-weight:700; letter-spacing:.18em; color:#79748d; text-transform:uppercase; margin-bottom:7px}
+    h1 {font-size:26px; font-weight:650; letter-spacing:-.7px; margin:0}
+    .sample {font-size:12px; color:#487DA1; padding:9px 14px; border:1px solid #d3e6f0; border-radius:20px; background:#edf6fa}
+    main {max-width:1180px; margin:auto; padding:0 24px 28px}
+    .workspace {display:grid; grid-template-columns:minmax(0,1fr) 270px; background:white; border:1px solid #e4e2eb; border-radius:18px; overflow:hidden; box-shadow:0 8px 32px #26213b06}
+    .canvas-column {min-width:0}
+    nav {display:flex; gap:5px; padding:16px; border-bottom:1px solid #efedf3}
+    nav button {border:0; background:transparent; padding:10px 15px; border-radius:8px; color:#777080; font-size:13px}
+    nav button[aria-pressed="true"] {background:#edf6fa; color:#487DA1; font-weight:600}
+    #plot {width:100%; aspect-ratio:1; background:white}
+    .hint {font-size:12px; color:#8b8795; padding:14px 20px; border-top:1px solid #efedf3}
+    aside {border-left:1px solid #efedf3; padding:26px 22px}
+    h2 {font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:#8b8498; font-weight:650; margin:0 0 16px}
+    .layer {width:100%; display:flex; align-items:center; gap:10px; border:0; padding:11px 0; background:transparent; text-align:left; font-size:13px; color:#393342}
+    .dot {width:9px; height:9px; border-radius:50%; background:var(--color); flex:none}
+    #element-legend {display:flex; flex-wrap:wrap; gap:12px; margin:8px 0 14px; font-size:11px; color:#746b7e}
+    #element-legend[hidden] {display:none}
+    #element-legend span {display:inline-flex; align-items:center; gap:5px}
+    .switch {margin-left:auto; width:30px; height:18px; padding:3px; border-radius:20px; background:#e5e2e9; flex:none}
+    .switch::after {content:""; display:block; width:12px; height:12px; border-radius:50%; background:white; box-shadow:0 1px 3px #0002}
+    [aria-pressed="true"] .switch {background:#88BFDA} [aria-pressed="true"] .switch::after {transform:translateX(12px)}
+    .divider {height:1px; background:#eeecf2; margin:23px 0}
+    .threshold-label {display:flex; justify-content:space-between; font-size:12px; margin:22px 0 8px; color:#746981}
+    #iso {width:100%; accent-color:#B4A1D1}
+    .color-field {display:flex; gap:8px; align-items:center}
+    .color-field input[type=color] {width:42px; height:35px; padding:2px; border:1px solid #e1dce8; border-radius:7px; background:white; flex:none; cursor:pointer}
+    .color-field input[type=text] {min-width:0; font-family:monospace}
+    .secondary {background:white; border:1px solid #e3dfeb; border-radius:8px; padding:10px; font-size:12px; color:#6a5d7a; width:100%; margin-top:15px}
+    .field {display:block; font-size:12px; color:#736b7d; margin:14px 0 6px}
+    input[type=text],select {width:100%; border:1px solid #e1dce8; border-radius:7px; background:white; padding:9px 10px; font-size:12px; color:#41374f}
+    #save {width:100%; margin-top:17px; border:0; background:linear-gradient(110deg,#669BC2,#E7A5A1); color:#253a4a; border-radius:8px; padding:12px; font-size:13px; font-weight:600}
+    .destination {font-size:11px; line-height:1.8; color:#938b9e; margin:10px 0 0; overflow-wrap:anywhere}
+    #status {min-height:24px; margin:15px 3px 0; font-size:13px; line-height:1.7; color:#746580; overflow-wrap:anywhere}
+    #status.error {color:#b33f53} #status a {color:#765694}
+    #camera-report {margin-top:18px; padding:20px; border:1px solid #e4e2eb; border-radius:12px; background:white}
+    #camera-summary {font-size:13px; line-height:1.7; color:#655b71; margin:0 0 12px}
+    #camera-output {width:100%; height:285px; resize:vertical; border:1px solid #e3dfeb; border-radius:8px; padding:12px; background:#fafafd; color:#41374f; font:12px/1.6 monospace}
+    #copy-camera {width:auto; padding:9px 16px}
+    footer {font-size:11px; color:#99929f; margin:18px 3px}
+    @media(max-width:800px) {.workspace {grid-template-columns:1fr} aside {border-left:0; border-top:1px solid #eee; padding:22px} header {padding:22px 16px} main {padding:0 12px 20px} h1 {font-size:22px} nav {padding:10px} nav button {padding:10px}}
+  </style>
+  <script src="/assets/ngl.js" defer></script>
+  <script src="/assets/overview_clip.js" defer></script>
+  <script src="/assets/overview_ngl.js" defer></script>
+</head>
+<body>
+  <header><div><div class="eyebrow">VoxBind / Figure studio</div><h1>Overview visualizer</h1></div><span class="sample" id="sample">Loading sample…</span></header>
+  <main>
+    <div class="workspace">
+      <section class="canvas-column" aria-label="3D visualizer">
+        <nav aria-label="View">
+          <button data-view="overview" aria-pressed="true" disabled>Overview</button>
+          <button data-view="gradient" aria-pressed="false" disabled>Density gradient</button>
+          <button id="masking" aria-pressed="false" title="Overview 위에 masking 정육면체 표시" disabled>Masking</button>
+        </nav>
+        <div id="plot" aria-label="Rotate and zoom the molecular scene"></div>
+        <div class="hint">드래그하여 회전 · 스크롤하여 확대 · 레이어를 선택하고 현재 화면을 저장하세요</div>
+      </section>
+      <aside>
+        <h2>Protein–ligand pair</h2>
+        <label class="field" for="sample-select">추천 구조</label>
+        <select id="sample-select" disabled></select>
+        <p class="destination">2P0D의 저장된 시점으로 시작합니다.</p>
+        <div class="divider"></div>
+        <h2>Visible layers</h2>
+        <div id="layers"></div>
+        <div id="element-legend" aria-label="Ligand atom colors" hidden></div>
+        <p class="destination">Grid를 끄면 protein·occupancy·density를 주변 24 Å까지 표시합니다. Overview에서는 전체 protein cartoon도 켜집니다.</p>
+        <div id="density-style-control"><label class="field" for="density-style">Density 표현</label><select id="density-style" disabled><option value="mesh">Wire mesh · 등밀도면</option><option value="contours">Contours · 단면 등고선</option></select></div>
+        <label class="field" id="density-color-label" for="density-color">Electron density 색상</label>
+        <div class="color-field"><input id="density-color" type="color" value="#4761f2" disabled><input id="density-hex" type="text" value="#4761F2" aria-label="Electron density HEX" maxlength="7" pattern="#[0-9A-Fa-f]{6}" spellcheck="false" disabled></div>
+        <div id="density-proximity-control"><button id="density-proximity" class="layer" aria-pressed="true" disabled><span>원자 주변으로 제한</span><span class="switch"></span></button><p class="destination">2.5 Å부터 감소 · 3.0 Å 밖은 숨김<br>끄면 현재 표시 범위 전체를 표시합니다.</p></div>
+        <div id="threshold"><label class="threshold-label" for="iso"><span id="iso-label">Density iso</span><output id="iso-value">1.00</output></label><input id="iso" type="range" min="0.05" max="1" step="0.05" value="1" disabled></div>
+        <button id="reset" class="secondary" disabled>기본 시점으로 돌아가기</button>
+        <button id="print-camera" class="secondary" aria-controls="camera-report" disabled>현재 카메라 각도 출력</button>
+        <div class="divider"></div>
+        <h2>Save image</h2>
+        <label class="field" for="name">파일 이름</label><input id="name" type="text" value="overview" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,79}" spellcheck="false">
+        <label class="field" for="format">파일 형식</label><select id="format"><option value="png">PNG · 1520 × 1520</option><option value="pdf">PDF · 1520 × 1520 이미지</option><option value="both">PNG + PDF</option></select>
+        <button id="save" disabled>현재 이미지 저장</button>
+        <p class="destination">PNG·PDF 모두 투명 배경으로 저장합니다.<br>저장 위치: figures/fig-overview/exports/pre-training/<br>이 viewer의 모든 이미지를 같은 폴더에 저장합니다.<br>파일 이름에 시각이 붙어 기존 이미지를 보존합니다.</p>
+      </aside>
+    </div>
+    <div id="status" role="status" aria-live="polite">3D 데이터를 불러오고 있어요…</div>
+    <section id="camera-report" aria-label="출력한 카메라 설정" hidden>
+      <h2>Camera snapshot</h2>
+      <p id="camera-summary" aria-live="polite"></p>
+      <textarea id="camera-output" aria-label="카메라 설정 JSON" readonly spellcheck="false"></textarea>
+      <button id="copy-camera" class="secondary">설정 복사</button>
+    </section>
+    <footer>Ligand · protein pocket · electron density — 16 Å cube / 24 Å surrounding context</footer>
+  </main>
+</body>
+</html>

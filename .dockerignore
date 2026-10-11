@@ -1,0 +1,81 @@
+# Build context excludes. Paths are relative to the repo root (the build context).
+# Keep the image tiny: only source needed for `pip install -e .` should ship.
+# Data / weights / outputs are mounted at runtime, never baked in.
+
+# --- VCS / editor ---
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# --- Python build artifacts ---
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.ruff_cache/
+**/.ruff_cache/
+
+# --- envs ---
+.venv/
+venv/
+.env
+FuncBind/.git
+FuncBind/.repro-env
+FuncBind/.repro-env/
+FuncBind/.venv/
+FuncBind/venv/
+FuncBind/funcbind/.runtime/
+FuncBind/scripts/mcp_assets.env
+
+# --- Heavy data / weights / experiment outputs (correct NESTED paths) ---
+dataset/data/
+pretrain/exps/
+pretrain/log/
+task1-affinity_regression/log/
+task2-ligand_generation/exps/
+task2-ligand_generation/log/
+task2-ligand_generation/wandb/
+task2-ligand_generation/notebook/
+log/
+model_zoo/
+legacy/
+FuncBind/funcbind/dataset/data/
+FuncBind/exps/
+FuncBind/funcbind/exps/
+FuncBind/funcbind/logs/
+FuncBind/funcbind/results/
+FuncBind/logs/
+notebook/
+results/
+base/
+figures/
+examples/
+
+# --- Large binary artifacts anywhere in the tree ---
+*.pt
+*.pth
+*.pth.tar
+*.ckpt
+*.tar
+*.tar.gz
+*.tar.zst
+*.zip
+*.ccp4
+*.mtz
+*.map
+*.h5
+*.hdf5
+*.npy
+*.npz
+multinodetraining.pdf
+
+# --- one-offs ---
+sync_to_*.sh
+FuncBind/funcbind/sample_combined.pdb
+FuncBind/funcbind/seed_combined.pdb

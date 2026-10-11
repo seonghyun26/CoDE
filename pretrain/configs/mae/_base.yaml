@@ -1,0 +1,21 @@
+# Objective base: the MAE loss and training keys every weighting option shares. Masking lives in
+# mask/. Not a standalone choice (leading _).
+pretext_style: mae
+sigma_noise: 0.0
+density_channel_weight: 0.1
+gradmag_channel_weight: 0.1
+density_weight_warmup_epochs: 0
+gradmag_reconstruct: true
+gradmag_noise: false
+# true keeps the gradmag channel but drops density from the input (the CG modality-ladder rung).
+gradmag_without_density: false
+atom_pos_weight: 10.0
+atom_pos_thresh: 0.05
+lambda_dens: 1.0
+lambda_str: 1.0
+struct_pos_weight: 100.0
+struct_pos_thresh: 0.05
+ema_decay: 0.999
+grad_clip: 1.0
+val_every: 1
+ckpt_every: 5

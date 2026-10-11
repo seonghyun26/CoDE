@@ -1,0 +1,5 @@
+# Release checkpoints (fetched by base/scripts/targetdiff.sh), predictions and logs
+pretrained_models/
+preds/
+log/
+__pycache__/

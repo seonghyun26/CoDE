@@ -1,0 +1,12 @@
+# @package _global_
+# The 0623 recipe (260623_ar_cvit_c1_g742): v1 encoder, uniform mask 0.50. Same as the base
+# defaults, so it names the run; the corpus is CoDE_pretrain_v1, not the source run's.
+defaults:
+  - override /dset: CoDE_pretrain_v1
+  - override /model: v1
+  - override /mae: invfreq
+  - override /mask: uniform
+
+exp_name: cvit_g742_0623
+wandb_tags: [pretrain, cdg, 40m, g742, CoDE_pretrain_v1, mask050, uniform, atomblob7]
+num_epochs: 100

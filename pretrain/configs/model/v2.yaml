@@ -1,0 +1,23 @@
+# v2 encoder: ~100M ChannelViT-MAE (the CDG_v2 champion), atomblob7 groups [7,4,2] over 13 channels.
+# patch_embed_mode is explicit: the code default is `fused`, which builds a different model.
+model_name: v2
+n_channels: 32
+patch_size: 8
+input_mode: atomblob_density
+with_gradmag: true
+n_in_channels: 13       # 11 atom-type (7 lig + 4 poc) + 1 density + 1 gradmag
+dim: 640
+depth: 18
+heads: 10
+mlp_ratio: 4
+dropout: 0.1
+pos_encoding: learnable
+rope_fast: false
+n_struct_channels: 0    # disabled: atoms ARE part of the input
+dual_head: false
+head_hidden_dim: 67     # per-patch 2-layer MLP recon head (~1.0M params)
+head_depth: 2
+patch_embed_mode: channel_group
+channel_groups: [7, 4, 2]      # lig atoms / poc atoms / (density + gradmag), sum = 13
+channel_group_dropout: 0.0     # HCS off: the champion did not use channel-group dropout
+head_style: patch_mlp

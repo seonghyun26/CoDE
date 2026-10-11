@@ -1,0 +1,142 @@
+{
+  "note": "Frozen, version-controlled splits. Source of truth is the CSV; MANIFEST.json pins counts+sha256. Regenerate via make_splits.py.",
+  "schemes": {
+    "lp_edrscc_v2": {
+      "file": "lp_edrscc_v2.csv",
+      "counts": {
+        "train": 3850,
+        "val": 817,
+        "test": 1320,
+        "total": 5987
+      },
+      "sha256": "55122339061d3d6d77f3a649da1130be7a2d5b571417656eb5f502879245129e",
+      "description": "lp_edrscc_v1 \u2229 (Kd or Ki) \u2014 IC50 dropped; ED-available \u2229 (lig & poc RSCC \u2265 0.8), non-covalent",
+      "partition": "LP_PDBBind 'new_split' column (sequence-identity clustered)",
+      "generalization": "novel-target (sequence-dedup); Kd/Ki-only affinity labels (no assay-dependent IC50)",
+      "inputs": {
+        "ed_rscc_split": "ed_rscc_split.csv",
+        "lp_pdbbind": "LP_PDBBind.csv",
+        "rscc_threshold": 0.8,
+        "measurement_types": [
+          "Kd",
+          "Ki"
+        ]
+      }
+    },
+    "lp_edrscc_v2_cl123": {
+      "file": "lp_edrscc_v2_cl123.csv",
+      "counts": {
+        "train": 1559,
+        "val": 410,
+        "test": 733,
+        "total": 2702
+      },
+      "sha256": "a33f9838987d6ae136bc222703ba8551a4fb2fa16017a3235ae8daaeb3f96f78",
+      "description": "lp_edrscc_v2 \u2229 LP-PDBBind cleaning level(s) CL1+CL2+CL3 (applied to all splits); ED-available \u2229 (lig & poc RSCC \u2265 0.8) \u2229 (Kd or Ki), non-covalent",
+      "partition": "LP_PDBBind 'new_split' column (sequence-identity clustered)",
+      "generalization": "novel-target (sequence-dedup); Kd/Ki-only; LP cleaning CL1+CL2+CL3 \u2014 a progressively-cleaner subset of lp_edrscc_v2 (all splits filtered)",
+      "inputs": {
+        "ed_rscc_split": "ed_rscc_split.csv",
+        "lp_pdbbind": "LP_PDBBind.csv",
+        "rscc_threshold": 0.8,
+        "measurement_types": [
+          "Kd",
+          "Ki"
+        ],
+        "cleaning_levels": [
+          "CL1",
+          "CL2",
+          "CL3"
+        ]
+      }
+    },
+    "lp_edrscc_v2_ID30": {
+      "file": "lp_edrscc_v2_ID30.csv",
+      "counts": {
+        "train": 3324,
+        "val": 817,
+        "test": 1320,
+        "total": 5461
+      },
+      "sha256": "567b421839c81e86171ba796253db18ac6e6c839db4ab2309055612c48a4ced9",
+      "description": "lp_edrscc_v2 without the train complexes whose protein has ATOM3D identity >= 30% to a CL3 test protein; val and test unchanged",
+      "base_scheme": "lp_edrscc_v2",
+      "base_sha256": "55122339061d3d6d77f3a649da1130be7a2d5b571417656eb5f502879245129e",
+      "anchor": "lp_edrscc_v2_cl123 test",
+      "similarity": "atom3d",
+      "identity_min_percent": 30,
+      "identity_definition": "BLASTP HSP identical residues / test-chain length (atom3d/protein/sequence.py find_similar)",
+      "train_removed": 526,
+      "search_tool": "blastp: 2.17.0+",
+      "inputs": {
+        "lp_pdbbind": "LP_PDBBind.csv"
+      }
+    },
+    "lp_edrscc_v2_ID60": {
+      "file": "lp_edrscc_v2_ID60.csv",
+      "counts": {
+        "train": 3655,
+        "val": 817,
+        "test": 1320,
+        "total": 5792
+      },
+      "sha256": "b48aa2bfb2add8167d8214187fcbeceecb0ca751b5e560d161052000ba484254",
+      "description": "lp_edrscc_v2 without the train complexes whose protein has ATOM3D identity >= 60% to a CL3 test protein; val and test unchanged",
+      "base_scheme": "lp_edrscc_v2",
+      "base_sha256": "55122339061d3d6d77f3a649da1130be7a2d5b571417656eb5f502879245129e",
+      "anchor": "lp_edrscc_v2_cl123 test",
+      "similarity": "atom3d",
+      "identity_min_percent": 60,
+      "identity_definition": "BLASTP HSP identical residues / test-chain length (atom3d/protein/sequence.py find_similar)",
+      "train_removed": 195,
+      "search_tool": "blastp: 2.17.0+",
+      "inputs": {
+        "lp_pdbbind": "LP_PDBBind.csv"
+      }
+    },
+    "lp_edrscc_v2_cl123_ID30": {
+      "file": "lp_edrscc_v2_cl123_ID30.csv",
+      "counts": {
+        "train": 1279,
+        "val": 410,
+        "test": 733,
+        "total": 2422
+      },
+      "sha256": "cbf54ae7e77d1e0c448425161a80fa63e11548d971f5a64fea858c4e865ddcf9",
+      "description": "lp_edrscc_v2_cl123 without the train complexes whose protein has ATOM3D identity >= 30% to a CL3 test protein; val and test unchanged",
+      "base_scheme": "lp_edrscc_v2_cl123",
+      "base_sha256": "a33f9838987d6ae136bc222703ba8551a4fb2fa16017a3235ae8daaeb3f96f78",
+      "anchor": "lp_edrscc_v2_cl123 test",
+      "similarity": "atom3d",
+      "identity_min_percent": 30,
+      "identity_definition": "BLASTP HSP identical residues / test-chain length (atom3d/protein/sequence.py find_similar)",
+      "train_removed": 280,
+      "search_tool": "blastp: 2.17.0+",
+      "inputs": {
+        "lp_pdbbind": "LP_PDBBind.csv"
+      }
+    },
+    "lp_edrscc_v2_cl123_ID60": {
+      "file": "lp_edrscc_v2_cl123_ID60.csv",
+      "counts": {
+        "train": 1430,
+        "val": 410,
+        "test": 733,
+        "total": 2573
+      },
+      "sha256": "4251502b49343d0a5ad8410159644b508898dcf92548cf0ecf3e8fae0e8a7c18",
+      "description": "lp_edrscc_v2_cl123 without the train complexes whose protein has ATOM3D identity >= 60% to a CL3 test protein; val and test unchanged",
+      "base_scheme": "lp_edrscc_v2_cl123",
+      "base_sha256": "a33f9838987d6ae136bc222703ba8551a4fb2fa16017a3235ae8daaeb3f96f78",
+      "anchor": "lp_edrscc_v2_cl123 test",
+      "similarity": "atom3d",
+      "identity_min_percent": 60,
+      "identity_definition": "BLASTP HSP identical residues / test-chain length (atom3d/protein/sequence.py find_similar)",
+      "train_removed": 129,
+      "search_tool": "blastp: 2.17.0+",
+      "inputs": {
+        "lp_pdbbind": "LP_PDBBind.csv"
+      }
+    }
+  }
+}

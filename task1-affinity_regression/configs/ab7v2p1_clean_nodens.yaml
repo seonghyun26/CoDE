@@ -1,0 +1,5 @@
+# Table 2 "w.o. D channel": atoms and the gradient magnitude of the real density, groups [7,4,1].
+# Recipe and evaluation as in ab7v2p1_clean.yaml; the encoder's cfg adds gradmag to the atomblob input.
+name: 261009_ab7v2p1_clean_nodens
+pretrain: {experiment: ab7v2p1_clean_nodens, gpus: 0-3, overrides: [bsz=8, accum_steps=4]}
+evaluate: {condition: atomblob, gpu: 0}

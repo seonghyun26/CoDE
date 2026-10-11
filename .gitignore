@@ -1,0 +1,47 @@
+# Caches and editor state
+**/__pycache__/
+**/*egg-info*
+**/.ipynb_checkpoints/
+.vscode
+.cache/
+tmp/
+
+# Training runs and logs
+**/wandb/
+**/exps
+*log*/
+**/diagnostics/
+jobs/
+
+# Data (script/01_download_data.sh, the dataset pipelines)
+**/data
+**/data_crossdocked*
+*.cif
+*.map
+*.pdb
+*.ccp4
+*.npz
+*.json
+*.csv1
+*.sdf
+
+# Weights and bundles
+*.pt
+*.pkl
+*.pth
+*.pth.tar
+*.ckpt
+*.tar
+*.tar.gz
+*.sha256
+
+# This machine's settings (script/_common.sh reads env.local.sh)
+env.local.sh
+*.env
+
+# Downloaded weights, results and the figure data (figures/draw.py)
+/model_zoo/
+/results/
+/figures/_data
+# External affinity test cohorts; on disk only.
+/task1-affinity_regression/test/

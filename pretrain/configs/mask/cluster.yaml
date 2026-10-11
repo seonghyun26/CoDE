@@ -1,0 +1,8 @@
+# @package mae
+# A few large contiguous holes grown around atom-weighted seed blocks.
+defaults:
+  - _base
+  - _self_
+mask_strategy: cluster
+mask_ratio: 0.5
+mask_n_seeds: 4

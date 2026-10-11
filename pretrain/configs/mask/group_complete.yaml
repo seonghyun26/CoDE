@@ -1,0 +1,10 @@
+# @package mae
+# Each sample hides one channel group almost entirely and masks the rest lightly.
+defaults:
+  - _base
+  - _self_
+mask_strategy: group_complete
+mask_ratio: 0.75
+group_complete_ratio: 0.9           # hidden group
+group_complete_light_ratio: 0.15    # visible groups
+group_complete_family_weights: null # e.g. [2, 1, 1] hides the ligand group twice as often

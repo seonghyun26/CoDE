@@ -1,0 +1,5 @@
+# Table 2 "w.o. D, G (CoE)": the 11 atom channels only, groups [7,4]. Recipe and evaluation as in
+# ab7v2p1_clean.yaml; bsz 8 x accum 4 keeps the global batch at 128 on GPUs shared with other jobs.
+name: 261009_ab7v2p1_clean_coe
+pretrain: {experiment: ab7v2p1_clean_coe, gpus: 0-3, overrides: [bsz=8, accum_steps=4]}
+evaluate: {condition: atomblob, gpu: 0}

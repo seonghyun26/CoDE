@@ -1,0 +1,74 @@
+# Base pretraining config. A run is composed as:
+#     pretrain/train_density.py --config-name=pretrain +experiment=<name>
+# One option per axis (dset/ model/ mae/ mask/ vox/), plus run metadata, optim and throughput
+# knobs. Presets in experiment/ override axes and name the run.
+# Defaults: the 0623 recipe (v1 encoder, uniform mask 0.50) on CoDE_pretrain_v1; the source run used
+# the older 17,430-complex corpus, so this is not a replay.
+defaults:
+  - dset: CoDE_pretrain_v1
+  - model: v1
+  - mae: invfreq
+  - mask: uniform
+  - vox: default
+  - override hydra/job_logging: custom
+  - _self_
+
+# ── run metadata ───────────────────────────────────────────────────────────────
+debug: false
+wandb: true
+wandb_tags: []
+wandb_entity: eddy26      # target the eddy26 team/workspace (requires the wandb login to be an eddy26 member)
+num_workers: 6
+prefetch_factor: 2
+resume: null
+resume_epoch: null
+exp_dir: exps
+exp_name: ???            # set by the experiment preset (mandatory)
+output_dir: null
+
+# ── optim / schedule ─────────────────────────────────────────────────────────────
+seed: 42
+# 100 for the 0623 recipe (its useful checkpoint is e0099). The LR is constant, so a shorter run
+# passes through the same states; cdg_v2_champion pins 25.
+num_epochs: 100
+aug: true
+bsz: 8
+accum_steps: 8
+lr: 1e-4
+wd: 5e-2
+
+# ── runtime / throughput knobs (260611; amp + compile ON by default) ─────────────
+amp:
+  enabled: true
+  dtype: bf16
+channels_last: false
+optimizer:
+  fused: false
+ema:
+  foreach: false
+compile:
+  enabled: true
+  backend: inductor
+  mode: default
+  fullgraph: false
+  dynamic: false
+
+# ── input composition: lives in the model/ group now (P1b/#2) — the selected model file fixes
+#    input_mode / with_gradmag / n_in_channels together. The trainer mirrors them to the legacy
+#    top-level location at runtime for back-compat (_reconcile_input_keys). ───────────────────────
+
+# ── hydra plumbing (de-duped from the 14 monoliths) ──────────────────────────────
+hydra:
+  run:
+    dir: ./${exp_dir}/${exp_name}
+  job:
+    config:
+      override_dirname:
+        kv_sep: ""
+        item_sep: "_"
+        exclude_keys: [
+            "exp_dir", "lr", vox.grid_dim, "wd", "resume", "resume_epoch", "wandb",
+            "num_workers", "exp_name", "output_dir", "out_dir",
+            "bsz", "accum_steps", "seed", "num_epochs", "aug", "pocket_radius",
+            "grid_dim", "debug"
+]

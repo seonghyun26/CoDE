@@ -1,0 +1,64 @@
+model_name: voxbind
+n_channels: 32
+ch_mults: [1, 2, 2, 4]
+is_attn: [False, False, True, True]
+n_blocks: 2
+n_groups: 16
+dropout: .1
+with_density: false              # add density_encoder branch (requires dset with xray_density field)
+density_encoder_type: cnn        # cnn | vit  (cnn = original ResidualBlock stack; vit = pure 3D ViT, see models/density_vit.py)
+density_encoder_blocks: 1        # cnn-only: # of ResidualBlocks (set to 4 to load the 260521 pretrained encoder)
+density_vit:                     # vit-only knobs (ignored for cnn); load the 260522 ViT-MAE encoder with these defaults
+  patch: 8                       # voxels per patch edge → at G=64, 8³=512 tokens
+  dim: 192                       # transformer hidden width
+  depth: 6                       # transformer blocks
+  heads: 6                       # attention heads
+  mlp_ratio: 4                   # MLP hidden = dim × mlp_ratio
+  dropout: 0.1
+  n_in_channels: null            # null → density FIELD only (1ch, or 2ch when with_gradmag).
+                                 # 13 → full-voxel conditioning (Path B): reuse a combined
+                                 # atomblob_density_gradmag ViT-MAE (e.g. ../pretrain/exps/260616_best) frozen,
+                                 # fed [ligand=0, pocket, density, gradmag]; gradmag derived in-model.
+density_pretrained_path: null    # path to a density-MAE checkpoint (cnn or vit, must match density_encoder_type)
+density_freeze: false            # freeze the density_encoder branch (requires_grad=False, dropout off)
+density_mask_ligand: false       # Path B leak-removal: blank density+gradmag inside the CLEAN ligand
+                                 # footprint (mask region from the ligand coords) so the frozen encoder
+                                 # can't read the co-crystal ligand's own density. Requires n_in_channels=13.
+density_encoder_sees_ligand: false  # REFERENCE: give the frozen encoder the available reference ligand
+                                 # (train = clean voxels, sampling = reference ligand).
+                                 # Upper-bound measurement, NOT de-novo generation.
+density_mask_threshold: 0.2      # occupancy threshold on the summed clean-ligand voxel grid
+density_mask_dilate: 2           # voxels to dilate the mask (0.25Å grid → 2 = 0.5Å) to cover the x-ray envelope
+density_attenuate: false         # PROTEIN-ONLY attenuation field alpha(x): high near protein atoms (preserve),
+                                 # low in open space (attenuate), then rho' = alpha*rho + (1-alpha)*noise.
+                                 # Built from the POCKET channels only — ligand coordinates never enter, so
+                                 # (a) the mask shape cannot encode ligand shape (unlike density_mask_ligand,
+                                 # whose hole IS ligand-shaped) and (b) it is computable at GENERATION time,
+                                 # making the training and deployment conditions identical. Applied before
+                                 # gradmag so channel 12 tracks the attenuated map. Default off.
+density_attenuate_sigma: 7.0     # transition width in voxels (1 vox = 0.25A) -> 7 = 1.75A, at/above the map's
+                                 # own blur. A sharper boundary is physically impossible and reads as a feature.
+density_attenuate_quantile: 0.90 # proximity value mapped to alpha=1; quantile over OCCUPIED voxels so dense
+                                 # protein cores don't compress the rest of the field toward 0.
+density_attenuate_strength: 1.0  # global dose: alpha_eff = 1 - strength*(1-alpha). 0 = no-op, 1 = full.
+                                 # Sweeping this is the performance-vs-alpha dose-response curve.
+density_attenuate_noise_sigma: 7.0  # blur applied to the fill noise (voxels) before unit-variance renorm, so its
+                                 # gradient statistics resemble real density. 0 = white randn = gradmag OOD.
+density_noise_alpha: 1.0         # GLOBAL density->noise blend: d = a*d + (1-a)*noise, applied BEFORE gradmag
+                                 # is derived so channel 12 matches the map the encoder sees. 1.0 = exact no-op
+                                 # (existing configs unaffected); 0.0 = pure noise = the "random density"
+                                 # lower-bound condition. Sweep 1->0 at TEST TIME to measure how much a trained
+                                 # model relies on density at all. No spatial structure — the soft alpha(x) field
+                                 # (attenuate open space, preserve protein-adjacent density) is a separate thing.
+density_noise_sigma: 0.0         # voxels (1 vox = 0.25A). >0 blurs the noise to that scale and restores unit
+                                 # variance, so its gradient statistics resemble real density. 0 = white randn,
+                                 # which makes gradmag strongly OOD and conflates "density removed" with
+                                 # "gradmag broken". Use ~7 (1.75A) for a physically honest degradation.
+density_encoder_amp: false       # bf16 autocast for the FROZEN density encoder's forward ONLY. The denoiser
+                                 # (UNet3D + fusion) stays fp32, matching the paper's train.py — only the
+                                 # frozen conditioning encoder runs in bf16, which is the precision it was
+                                 # pretrained under (train_density.py `amp.enabled: true`). No gradient path
+                                 # through it, and the output is cast back to fp32 before fusion, so trained
+                                 # weights are unaffected. ~2.3x on the encoder forward. Default off.
+fusion: proj_sum                 # proj_sum | proj_pocket | token_concat | encoder_replace | cross_attn,
+                                 # described in task2-ligand_generation/configs/README.md; legacy names (default, v3, v4) still load.

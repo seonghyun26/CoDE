@@ -1,0 +1,8 @@
+# @package mae
+# Contact blocks first, then the other atom-occupied blocks, empty space last.
+defaults:
+  - _base
+  - _self_
+mask_strategy: interface_atom
+mask_ratio: 0.75
+mask_atom_tau: 1.0

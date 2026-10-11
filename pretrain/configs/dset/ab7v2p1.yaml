@@ -1,0 +1,19 @@
+# PLINDER v2.1 atomblob7 through its 96^3 box: the atomblob7 v2.1 encoder's corpus.
+# Built on another server, so not on every machine.
+dset_name: crossdocked_xray
+data_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}
+data_file: pretrain/data_train_plinder_v2p1_atomblob7.pt
+crops_dir: ''
+ccp4_dir: ../dataset/data/ccp4
+resample_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/pretrain/xray_resample_plinder_v2p1
+box_path: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/pretrain/xray_resample_plinder_v2p1/box96.dat
+ligand_radius: -1
+pocket_radius: -1
+use_xray: true
+cache_size: 32
+normalize: false
+subset_n: 106000
+subset_xray_only: true
+subset_val_n: 100
+n_lig_ch: 7
+n_poc_ch: 4

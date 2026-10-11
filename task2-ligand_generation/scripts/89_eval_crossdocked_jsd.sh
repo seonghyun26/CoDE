@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# 89_eval_crossdocked_jsd.sh — the TargetDiff / VoxBind distribution metrics for every arm
+# figures/draw.py draws: bond-distance, pair-distance and atom-type JSD against the
+# CrossDocked ligands (train+test, de-duplicated -- the main reference -- and the 100 test
+# ligands of the published protocol beside it), the ring-size table, and the VoxBind
+# Fig. 10 histograms.
+#
+#   bash task2-ligand_generation/scripts/89_eval_crossdocked_jsd.sh
+#   conda run -n voxbind python figures/draw.py jsd
+#
+# The arms and their roots are figures/_parts/00_core.py's ARMS, spelled out: the labels
+# ARE the keys the figures colour by, so a label changed here must change there too. The
+# molecules are the 79 electron-density pockets for every arm (TargetDiff and VoxBind hold
+# 100; the extra 21 are left out so every arm stands on the same pockets). The main
+# reference is every train+test ligand of split_by_name.pt with each distinct molecule
+# weighing 1; the 100 test ligands the published numbers use ride beside it (`jsd_test`),
+# and so does the pose-weighted set (`jsd_pose_weighted`). The docstring of
+# tools/eval_crossdocked_jsd.py says why, and why TargetDiff's shipped histograms are not
+# used directly.
+#
+# --selfcheck re-scores TargetDiff over all 100 pockets and fails the run if it drifts
+# from the published row, so the protocol claim is re-verified every time this runs.
+# ~2 min on 16 workers; no GPU.
+set -euo pipefail
+ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$ROOT"
+export VOXBIND_BASEDRUG="${VOXBIND_BASEDRUG:-$(cd "$ROOT/.." && pwd)/base_drug}"
+# shellcheck source=../../voxbind/scripts/lib/common.sh
+source "$ROOT/voxbind/scripts/lib/common.sh"
+PY="${PY:-$(voxbind_conda_bin voxbind)/python}"
+WORKERS="${WORKERS:-16}"
+OUT="${OUT:-results/task2-drugdesign/_shared/260913_crossdocked_jsd/crossdocked_jsd.json}"
+E=task2-ligand_generation/exps
+
+"$PY" task2-ligand_generation/scripts/tools/eval_crossdocked_jsd.py \
+    --run "AR=$E/baselines_pose/ar" \
+    --run "Pocket2Mol=$E/baselines_pose/pocket2mol" \
+    --run "DiffSBDD=$E/baselines_pose/diffsbdd" \
+    --run "DecompDiff=$E/baselines_pose/decompdiff" \
+    --run "FuncBind=$E/baselines_pose/funcbind" \
+    --run "TargetDiff=$VOXBIND_BASEDRUG/eval/targetdiff" \
+    --run "VoxBind=$E/_vanilla_ep923/samples/full_eval_ep923" \
+    --run "CoDE=$E/voxbind_frozenenc_atomblob7_v2p1_sig0.9/samples/full_eval_ep350" \
+    --workers "$WORKERS" --selfcheck --out "$OUT"

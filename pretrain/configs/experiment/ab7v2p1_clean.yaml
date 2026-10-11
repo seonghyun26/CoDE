@@ -1,0 +1,23 @@
+# @package _global_
+# The atomblob7 v2.1 recipe (ab7v2p1_cdg, model_zoo/atomblob7_v2p1_cdg_cvit_e99) on CoDE_pretrain_v1:
+# PLINDER v2 without the proteins of the paper's test sets (the six affinity sets and the CrossDocked
+# test set). in_vocab_only drops complexes whose ligand has an atom outside the 7 ligand channels, as
+# the v2.1 corpus did. Density comes from the 116^3 box (ab7v2p1 used a 96^3 box, which exists only
+# on the server it was built on).
+defaults:
+  - override /dset: CoDE_pretrain_v1
+  - override /model: v1
+  - override /mae: invfreq
+  - override /mask: uniform
+
+exp_name: ab7v2p1_clean
+wandb_tags: [pretrain, atomblob7, CoDE_pretrain_v1, in_vocab_only, density_gradmag, 40m, channelvit]
+bsz: 16              # global batch 128 = 16 x accum 2 x 4 GPUs, as the original run (32 x 4); 32 OOMs on a 3090
+accum_steps: 2
+dset: {in_vocab_only: true, n_lig_ch: 7, n_poc_ch: 4}
+model:
+  model_name: atomblob_density_vit_mae_40m
+  channel_groups: [7, 4, 1, 1]
+  n_channels_ligand: 7
+  n_channels_pocket: 4
+mae: {channel_weighting: uniform, val_every: 1, ckpt_every: 20, channel_weight_clip_ratio: 0.0}

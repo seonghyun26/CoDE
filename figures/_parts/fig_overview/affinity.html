@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binding affinity · Example selector</title>
+<style>{{POCKET_STYLES}}
+  header{max-width:1800px}.workspace{display:grid;grid-template-columns:370px minmax(0,1fr);gap:18px;padding:0 24px 24px;max-width:1800px;margin:auto}
+  aside{position:sticky;top:12px;border:1px solid #e2e3e5;border-radius:14px;background:white;align-self:start;overflow:hidden}aside .filters{padding:16px;display:grid;gap:9px}
+  #panels{padding:0;gap:16px;max-width:none;margin:0;align-items:start}#panels [hidden]{display:none!important}.heading{padding:16px 18px 6px}.scene{aspect-ratio:1}
+  .metric{display:flex;gap:15px;padding-top:10px;font-size:12px;color:#69717d}.metric strong{font-size:23px;display:block;line-height:1.15;color:#3c5fdf}.record-detail{margin-top:9px;min-height:38px;font-size:12px;color:#72757d}
+  input[type=search],input[type=number]{width:100%;padding:8px;border:1px solid #dadde2;border-radius:7px;min-width:0}.range-row{display:flex;gap:10px}.range-row label{display:grid;gap:3px;font-size:12px;flex:1}
+  .table-scroll{overflow:auto;max-height:clamp(110px,calc(100dvh - 750px),270px)}table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;padding:8px 7px;border-top:1px solid #eee;white-space:nowrap}thead{position:sticky;top:0;background:#f7f8fb;z-index:1}td button{padding:3px 7px;border-radius:4px;font-size:11px}.favorite{font-size:16px;padding:0;border:0;color:#a4aab5}.favorite[aria-pressed=true]{color:#cf981f}.selected-row{background:#f1f4ff}.count{padding:0 16px 10px;color:#777;font-size:12px}
+  #global-status{font-size:12px;color:#6b7280;margin-top:8px}#source{font-size:12px;margin-top:4px}.selection-bar{display:flex;align-items:center;justify-content:space-between;gap:16px}.selection-bar button{white-space:nowrap}
+  .controls{padding:14px}.controls .row{gap:8px}#delta{margin-top:8px;font-size:13px;color:#3c5fdf}
+  .ligand-palette{margin-bottom:14px}.palette-label{font-size:12px;color:#68717d;margin-bottom:8px}.swatches{display:flex;gap:7px;flex-wrap:wrap}.swatch{width:23px;height:23px;padding:0;border:2px solid transparent;border-radius:50%}.swatch[aria-pressed=true]{outline:2px solid #303847;outline-offset:2px}.panel .eyebrow,.panel .metric strong{color:var(--case-color,#3c5fdf)}
+  .scatter-export{padding:16px;border-top:1px solid #e2e3e5}#scatter-status{font-size:12px;color:#6b7280;margin:9px 0;overflow-wrap:anywhere}#scatter-preview{display:block;width:100%;max-width:280px;aspect-ratio:1;background:white;margin:0 auto}#scatter-caption{font-size:11px;color:#68717d;margin:5px 0 10px}#scatter-links{display:flex;gap:16px}#scatter-links a{color:#3c5fdf}
+  @media(max-width:1150px){.workspace{grid-template-columns:310px minmax(0,1fr)}#panels{grid-template-columns:1fr}.table-scroll{max-height:200px}}
+  @media(max-width:720px){.workspace{grid-template-columns:1fr;padding:0 12px 20px}aside{position:static}.table-scroll{max-height:320px}.selection-bar{align-items:start}header{padding:18px 12px}}
+</style></head><body>
+<header><div class="selection-bar"><div><h1>Binding affinity example selector</h1><p>Choose a higher- and lower-affinity example. Higher pK means stronger binding.</p></div><button id="save-selection">Save selected pair</button></div><p id="source">Loading data…</p><div id="delta"></div><div id="global-status" role="status"></div></header>
+<div class="workspace"><aside><div class="filters">
+  <input id="search" type="search" aria-label="Search PDB or protein class" placeholder="Search PDB / protein class">
+  <select id="sort" aria-label="Sort candidates"><option value="gt-desc">GT affinity: high → low</option><option value="gt-asc">GT affinity: low → high</option><option value="predicted-desc">Predicted: high → low</option><option value="predicted-asc">Predicted: low → high</option><option value="error-asc">Prediction error: small → large</option><option value="error-desc">Prediction error: large → small</option><option value="atoms-asc">Ligand atoms: small → large</option></select>
+  <div class="range-row"><label>Min GT pK<input id="min-gt" type="number" step="0.1" placeholder="Any"></label><label>Max GT pK<input id="max-gt" type="number" step="0.1" placeholder="Any"></label></div>
+  <label><input id="favorites-only" type="checkbox">Shortlisted only</label>
+  <div class="row"><button id="reset-filters">Reset filters</button><button id="extremes">Show GT extremes</button></div>
+</div><div id="count" class="count"></div><div class="table-scroll"><table><thead><tr><th>☆</th><th>PDB</th><th>GT</th><th>Pred.</th><th>View</th></tr></thead><tbody id="candidates"></tbody></table></div><div class="scatter-export"><svg id="scatter-preview" viewBox="0 0 230.4 230.4" role="img" aria-label="Live binding affinity scatter plot"></svg><div id="scatter-caption"></div><button id="update-scatter" class="primary">Update scatter plot</button><div id="scatter-status" role="status">Loading live scatter…</div><div id="scatter-links"></div></div></aside>
+<main id="panels"></main></div>
+{{PANEL_TEMPLATE}}
+<script>window.POCKET_NO_AUTO_START=true;</script><script src="/ngl.js"></script><script src="/pocket.js"></script><script src="/affinity.js"></script>
+</body></html>

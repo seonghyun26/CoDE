@@ -1,0 +1,7 @@
+# @package mae
+# Random blocks, all equally likely. The default (the 0623 recipe at 0.50).
+defaults:
+  - _base
+  - _self_
+mask_strategy: uniform
+mask_ratio: 0.5

@@ -1,0 +1,23 @@
+# small encoder: ~2.4M ChannelViT-MAE (5.2% of v1's encoder), for the scaling ablation. Otherwise v1.
+# patch_embed_mode is explicit: the code default is `fused`, which builds a different model.
+model_name: small
+n_channels: 32
+patch_size: 8
+input_mode: atomblob_density
+with_gradmag: true
+n_in_channels: 13       # 11 atom-type (7 lig + 4 poc) + 1 density + 1 gradmag
+dim: 96
+depth: 8
+heads: 4
+mlp_ratio: 4
+dropout: 0.1
+pos_encoding: learnable
+rope_fast: false
+n_struct_channels: 0    # disabled: atoms ARE part of the input
+dual_head: false
+head_hidden_dim: 67     # per-patch 2-layer MLP recon head (~1.0M params)
+head_depth: 2
+patch_embed_mode: channel_group
+channel_groups: [7, 4, 2]      # lig atoms / poc atoms / (density + gradmag), sum = 13
+channel_group_dropout: 0.0
+head_style: patch_mlp

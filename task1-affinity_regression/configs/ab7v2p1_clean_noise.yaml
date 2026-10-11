@@ -1,0 +1,10 @@
+# Table 2 "w. noisy D,G": the density replaced by voxels drawn from the empirical histogram of the
+# training crops' density (fixed per complex) and gradmag recomputed from it, groups [7,4,1,1]. The probe
+# sees the same noise: PDBbind crops drawn from that histogram (dataset/empirical_density_noise.py), with
+# gradmag derived from them as in pretraining.
+name: 261009_ab7v2p1_clean_noise
+pretrain: {experiment: ab7v2p1_clean_noise, gpus: 0-3, overrides: [bsz=8, accum_steps=4]}
+evaluate:
+  condition: atomblob_density_gradmag
+  gpu: 0
+  features_args: [--dens_dir, legacy/dataset/data/pretrain/cdg_v2_empirical_noise/probe/density]

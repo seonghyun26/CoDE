@@ -1,0 +1,28 @@
+# CoDE on the clean corpus: the atomblob7 v2.1 recipe (ChannelViT 41.5M, groups [7,4,1,1], uniform
+# mask 0.5, 100 epochs, global batch 128) pretrained on CoDE_pretrain_v1 with in-vocabulary ligands, then
+# probed on the six affinity test sets.
+#   python task1-affinity_regression/run.py task1-affinity_regression/configs/ab7v2p1_clean.yaml
+name: 261009_ab7v2p1_clean                # pretrain/exps/<name>; also tags its feature caches and results
+
+pretrain:
+  experiment: ab7v2p1_clean               # pretrain/configs/experiment/ab7v2p1_clean.yaml
+  trainer: live                           # legacy: the presets in legacy/pretrain/configs/experiment
+  gpus: 4-7
+  overrides: []                           # Hydra overrides; the preset's bsz 16 x accum 2 fits a 24 GB GPU
+
+evaluate:
+  epoch: best                             # the trainer's best-validation checkpoint
+  condition: atomblob_density_gradmag     # encoder input: atoms, density and its gradient magnitude
+  gpu: 4
+  seeds: 5                                # probe heads per split, as Table 1
+  select_seeds: 5                         # per candidate layer, compared by CL3 validation ρ
+  num_workers: 0
+  # Last-layer tokens, Table 1 head; only the pooling varies: token mean, max, mean+std, each
+  # channel group's mean, and mean + std + per-group std.
+  readouts:
+    - {name: mean, pool: mean, head: default}
+    - {name: max, pool: max, head: default}
+    - {name: meanstd, pool: meanstd, head: default}
+    - {name: groupmean, pool: groupmean, head: default}
+    - {name: groupstats, pool: groupstats, head: default}
+  # out_dir: results/task1-affinity/<name>

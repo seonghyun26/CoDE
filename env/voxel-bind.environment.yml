@@ -1,0 +1,68 @@
+# voxel-bind — the VoxBind runtime + everything FuncBind imports, in ONE env, so
+# FuncBind can `import voxbind.models.density_vit` directly instead of reaching
+# across two interpreters. Verified: `import funcbind.train_fb` succeeds here,
+# with NO changes to the FuncBind source.
+#
+# Human-editable functional spec. The byte-exact rebuild is the pair
+#   env/voxel-bind.conda-linux-64.lock  +  env/voxel-bind.pip.lock.txt
+# and that pair is what script/00_setup_env.sh uses -- prefer it. This file
+# documents intent and is what you edit before re-locking.
+#
+# NOT the paper env. voxbind.environment.yml is python 3.10 / cu118 / numpy 1.26
+# and is what the published numbers come from; this one mirrors the *live* box
+# (python 3.12, torch 2.5.1 cu124 wheels, numpy 2.4.6, rdkit 2025.3.6), because that
+# is the env the FuncBind smoke test was validated against.
+#
+# Lock with:
+#   conda-lock lock -f env/voxel-bind.environment.yml -p linux-64 --lockfile env/voxel-bind.conda-lock.yml
+name: voxel-bind
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy=2.4.6         # conda-owned deliberately: a conda numpy once shadowed the pip one, so pin it here and keep it out of the pip lock
+  - openbabel=3.1.1
+  - c-compiler          # cpdb-protein is source-only; this box has no system cc
+  - ipykernel           # notebook/probe work runs in this env
+  # PyRosetta is NOT here: only the antibody metrics reach it (metrics_ab ->
+  # utils_rosetta.interface_energy) and that import is lazy, so MCP/CrossDocked runs do not
+  # need it. For antibody work: -c https://conda.graylab.jhu.edu pyrosetta (~3.5 GB, licence).
+  - pip
+  - pip:
+      # --- VoxBind runtime (heavy stack is pip here, matching the live env) ---
+      - torch==2.5.1    # default PyPI wheel = cu124
+      - torchmetrics
+      - scipy
+      - pandas
+      - scikit-image
+      - matplotlib
+      - seaborn
+      - gemmi
+      - lmdb
+      - rdkit==2025.3.6
+      - pyuul
+      - hydra-core==1.3.2
+      - omegaconf==2.3.0
+      - wandb
+      - tqdm
+      # --- FuncBind density-branch extras (the "+ alpha") ---
+      - lightning==2.5.5          # pinned to FuncBind's .repro-env; plain install pulls 2.6.x
+      - pytorch-lightning==2.5.5
+      - einops==0.8.1
+      - biopandas==0.5.1
+      - cpdb-protein==0.2.0       # needs CC=<env>/bin/gcc at install time
+      # --- what `import funcbind.train_fb` pulls at module scope ---
+      - plotly
+      - easydict
+      - anarci                    # now a pure-python wheel on PyPI; no HMMER needed to import
+      - meeko==0.1.dev3
+      - AutoDockTools_py3 @ git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3.git@a62a5d98116f1590183b58a9ad732b997cf2579c
+      - datamol                   # posecheck runtime dep
+      - prolif                    # posecheck runtime dep
+      # posecheck==1.3.1 is installed separately with --no-deps (it pins pandas==2.0.0,
+      # which has no cp312 wheel). See the pip lock header.
+      #
+      # vina 1.2.7 = IMPORT SATISFACTION ONLY. py3.12 cannot have 1.2.2 (no wheel past
+      # cp39, sdist does not build, conda-forge starts at 1.2.7). All reported docking
+      # runs in the py3.8 `voxdock` env at vina 1.2.2 -- do not dock in this env.
+      - vina==1.2.7

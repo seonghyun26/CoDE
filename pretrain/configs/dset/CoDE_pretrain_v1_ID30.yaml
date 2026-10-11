@@ -1,0 +1,20 @@
+# CoDE_pretrain_v1_ID30: CoDE_pretrain_v1 without the proteins of CL3
+# (ATOM3D identity >= 30%: BLASTP identical residues / test-chain length).
+# Built by dataset/plinder/02_make_clean_corpus.py.
+# Retained 94886 positions (33408 PDBs); removed 5662 PDBs (12630 positions, 11.747%).
+dset_name: crossdocked_xray
+data_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}
+data_file: pretrain/data_train_plinder_v2_perelem.pt
+crops_dir: ''                  # OTF resample path → no frozen crops
+ccp4_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/ccp4
+resample_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/pretrain/xray_resample_CoDE_pretrain_v1_ID30
+box_path: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/pretrain/xray_resample_CoDE_pretrain_v1_ID30/box116.dat
+ligand_radius: -1              # -1 → per-atom vdW radii from the tuples
+pocket_radius: -1
+use_xray: true
+gradmag_as_density: false
+cache_size: 32
+normalize: false               # density pre-normalized in the resample recipe
+subset_n: 94786
+subset_xray_only: true
+subset_val_n: 100

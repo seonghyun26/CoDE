@@ -1,0 +1,3077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drug Design Viewer</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ngl@2.3.1/dist/ngl.js"></script>
+<!-- Plotly, basic bundle (scatter only): draws the distribution charts, for the hover read-out -->
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-basic-dist-min@2.35.2/plotly-basic.min.js"></script>
+<style>
+/* Apple-flavoured: SF Pro where it exists, Inter elsewhere; Apple's greys, hairline
+   separators, soft shadows and generous radii. The accent stays the project's. */
+:root{
+  --accent:#8092F6;
+  --accent-strong:#4761F2;
+  --accent-tint:rgba(128,146,246,.12);
+  --ink:#1D1D1F;
+  --muted:#86868B;
+  --faint:#AEAEB2;
+  --sep:rgba(0,0,0,.08);
+  --hair:rgba(0,0,0,.05);
+  --rule:rgba(0,0,0,.42);
+  --thread:#D9D9DE;
+  --bg:#F5F5F7;
+  --panel:#FFFFFF;
+  --fill:#F5F5F7;
+  --fill-hi:#EBEBED;
+  --empty:rgba(0,0,0,.025);
+  --cover:#EDEFF1;
+  --smibar:rgba(0,0,0,.42);--smibar-hi:rgba(0,0,0,.62);
+  --smitrack:rgba(0,0,0,.07);
+  --ok:#248A3D;          /* systemGreen, text weight */
+  --bad:#D70015;         /* systemRed, text weight */
+  --shadow:0 1px 3px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.055);
+  --shadow-hi:0 2px 6px rgba(0,0,0,.05), 0 14px 34px rgba(0,0,0,.09);
+  --r-lg:18px;
+  --r-md:14px;
+  --r-sm:9px;
+  --pad:14px;
+  --gap:16px;
+  --rail:156px;
+  --sec-op:.45;
+  /* 3D roles. The canvases are white in both themes, so these do not change in dark
+     mode. Drawn from the page palette: protein = accent, context = a tint of it,
+     box = accent-strong, ligand carbons = ink. See web/palette.md. */
+  --mol-protein:#8092F6;
+  --mol-context:#C9D0FB;
+  --mol-box:#4761F2;
+  --mol-ligand-c:#1D1D1F;
+  --mol-ghost:#A3A8AE;
+  --mol-surface:#FFFFFF;
+  /* interaction types: the 3D dumbbells and the eye that toggles each one */
+  --int-hbond:#2F80ED;
+  --int-hydrophobic:#F2994A;
+  --int-pistack:#27AE60;
+  --int-cationpi:#9B51E0;
+  --int-ionic:#EB5757;
+  --int-halogen:#2DB7A3;
+  --int-metal:#8D6E63;
+  --int-vdw:#C9A227;
+  --cols:3;
+}
+html{
+  font-size:16px;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+/* Chrome 121+ IGNORES every ::-webkit-scrollbar rule on an element where a standard
+   scrollbar-width / scrollbar-color is in effect -- and scrollbar-color inherits, so
+   setting it once on <html> silently disabled every width below, everywhere. The
+   standard properties therefore go only to browsers without the WebKit pseudo-
+   element (Firefox), whose "thin" is as thin as it allows. */
+@supports not selector(::-webkit-scrollbar){
+  html{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.26) transparent}
+  .smi{scrollbar-width:thin;scrollbar-color:var(--smibar) transparent}
+}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.26);border-radius:99px}
+::-webkit-scrollbar-track{background:transparent}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",
+              "Inter","Helvetica Neue",Arial,sans-serif;
+  font-size:13px;line-height:1.5;font-weight:400;
+  letter-spacing:-.005em;
+  display:flex;flex-direction:column;
+}
+button,select,input{font-family:inherit}
+
+/* ------------------------------------------------------------- title bar */
+/* three zones so the title is centred on the page, not on what is left of it */
+.titlebar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  gap:14px;padding:20px 22px 8px;flex:none}
+.titlebar h1{text-align:center}
+.titlebar .iconbtn{justify-self:end}
+.titlebar h1{font-size:23px;line-height:1.15;letter-spacing:-.022em;
+  font-weight:700;margin:0}
+.sp{flex:1}
+.iconbtn{
+  display:inline-flex;align-items:center;justify-content:center;
+  border:none;background:none;cursor:pointer;color:var(--muted);
+  font-size:20px;line-height:1;width:32px;height:32px;padding:0;border-radius:50%;
+  transition:color .15s,background .15s;
+}
+.iconbtn:hover{color:var(--ink);background:var(--fill-hi)}
+
+/* ------------------------------------------------------------- shell */
+/* Collapsing the rail animates the grid track itself, so the panel slides left and
+   the cards take the space back in one motion. */
+.shell{display:grid;grid-template-columns:var(--rail) 1fr;gap:var(--gap);
+  padding:8px var(--gap) var(--gap);flex:1;min-height:0;
+  transition:grid-template-columns .3s cubic-bezier(.4,0,.2,1)}
+body.railshut{--rail:40px}
+body.railshut .railList{opacity:0;pointer-events:none}
+.railList{transition:opacity .18s ease}
+/* collapsed: the caret on top, the title turned on its side beneath it */
+body.railshut aside .sechead{flex-direction:column;align-items:center;gap:12px;
+  padding:14px 8px}
+body.railshut aside .headtext{writing-mode:vertical-rl;text-align:left;flex:none}
+body.railshut aside .sub{display:none}
+/* expanded: the caret points left (the way it will fold); collapsed: right */
+aside .caret{transform:rotate(90deg)}
+body.railshut aside .caret{transform:rotate(-90deg);padding-top:0;order:-1}
+body.railshut aside{cursor:pointer}
+.panel{background:var(--panel);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+
+.sechead{padding:14px 16px 10px;flex:none}
+/* a section title has to outrank its own contents -- heavier, darker and a
+   step larger than the labels underneath it */
+.sechead h2{margin:0;font-size:14.5px;font-weight:700;letter-spacing:-.015em;
+  color:var(--ink)}
+.sechead .count{color:var(--faint);font-weight:500;font-size:12.5px}
+.sechead .sub{display:block;color:var(--faint);font-size:11px;font-weight:400;
+  letter-spacing:0;margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ------------------------------------------------------------- left rail */
+aside{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.railList{overflow-y:auto;flex:1;min-height:0;padding:0 8px 10px}
+.prow2{
+  display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:var(--r-sm);
+  cursor:pointer;font-size:12.5px;white-space:nowrap;
+}
+.prow2 .info{opacity:0;width:18px;height:18px;flex:none;font-size:10px;
+  font-weight:700;font-style:italic;font-family:Georgia,"Times New Roman",serif;
+  border:1px solid currentColor;border-radius:50%;color:var(--faint);
+  background:none;cursor:pointer;padding:0;line-height:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:opacity .12s,color .12s}
+.prow2:hover .info,.prow2.on .info{opacity:1}
+.prow2 .info:hover{color:var(--accent-strong)}
+.prow2:hover{background:var(--fill)}
+.prow2.on{background:var(--accent-tint);color:var(--accent-strong)}
+.prow2 .idx{font-variant-numeric:tabular-nums;font-weight:600;flex:none;width:20px}
+.prow2 .lig{color:var(--ink);overflow:hidden;text-overflow:ellipsis;flex:1;
+  font-size:12px;font-weight:500;letter-spacing:.02em}
+.prow2.on .lig{color:var(--accent-strong);opacity:.8}
+
+/* ------------------------------------------------------------- main */
+main{display:flex;flex-direction:column;gap:var(--gap);min-width:0;min-height:0}
+#vizsec,#statsec{flex:none}
+/* Collapsing on grid-template-rows animates to the content's own height, so the
+   panel folds smoothly without anyone having to know how tall it is. */
+.vizwrap{display:grid;grid-template-rows:1fr;
+  transition:grid-template-rows .28s cubic-bezier(.4,0,.2,1)}
+.panel.shut .vizwrap{grid-template-rows:0fr}
+.vizclip{overflow:hidden;min-height:0}
+.vizgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));
+  gap:14px 24px;padding:2px 16px 11px}
+.vg{display:flex;flex-direction:column;gap:6px;min-width:0}
+.vg .lbl{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.vgrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.vg input[type=range]{width:100%}
+.lbl{font-size:11px;color:var(--muted);letter-spacing:0;font-weight:500}
+.lbl b{font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;
+  margin-left:3px}
+.vg.wide{grid-column:1 / -1}
+/* the eye on an interaction row in a panel */
+.st.hasEye:not(.tr){gap:5px}
+.st.hasEye .v{margin-left:auto}
+.ceye{--ec:var(--ink);border:none;background:none;cursor:pointer;color:var(--ec);
+  padding:0;width:18px;height:16px;line-height:0;display:inline-flex;
+  align-items:center;justify-content:center;border-radius:4px;flex:none;opacity:.42}
+.ceye svg{width:14px;height:14px}
+/* each eye wears its interaction's colour -- the same one its dumbbells are drawn in */
+.ceye[data-ct="hydrogenBond"]{--ec:var(--int-hbond)}
+.ceye[data-ct="hydrophobic"]{--ec:var(--int-hydrophobic)}
+.ceye[data-ct="vdw"]{--ec:var(--int-vdw)}
+.ceye.on{opacity:1}
+.ceye:hover:not(:disabled){background:var(--fill);opacity:1}
+.ceye:disabled{--ec:var(--faint);opacity:.3;cursor:default}
+/* the Pose tree, threaded like a comment section: one line runs down from each open
+   parent's caret and curves into every child, stopping at the last one.
+   Geometry is explicit (no flex gap) so the line can be placed with calc():
+   a row at depth d starts its content at --tb + d*--ti; the 12px caret (or spacer)
+   is followed by 5px, so the caret's centre is +6 and the label starts at +17. */
+.stats{--tb:9px;--ti:16px}
+.in-metrics{--tb:4px;--ti:16px}
+/* centre, not baseline: a row with an eye or a caret has a 16px control in it, and
+   baseline alignment pins that control's bottom edge to the text baseline */
+.st.tr{justify-content:flex-start;align-items:center;gap:0;position:relative}
+/* (scoped, to outrank the .in-metrics .st padding shorthand further down) */
+.stats .st.tr,.in-metrics .st.tr{padding-left:calc(var(--tb) + var(--d) * var(--ti))}
+.st.tr .k{flex:none}
+.st.tr .ceye{margin-left:5px}
+/* every eye in a tree on one vertical line: a row's label ends where the deepest
+   row's longest label ends, so a shallower row's label is that much wider. In em, so
+   the panel (11px) and the inspector (12px) both fit "H-bond don." with room. */
+.st.tr.hasEye .k{width:calc(6.3em + (2 - var(--d)) * var(--ti))}
+.st.tr .v{margin-left:auto;padding-left:6px}
+.st.parent{cursor:pointer}
+.st.parent:hover .k{color:var(--ink)}
+/* tree-only class names: .fold / .sub are taken by the section headers */
+.tfold{border:none;background:none;padding:0;width:12px;height:12px;flex:none;
+  margin-right:5px;display:inline-flex;align-items:center;justify-content:center;
+  color:var(--muted);cursor:pointer;line-height:0;transition:transform .2s ease}
+.tfold-sp{width:12px;margin-right:5px;flex:none}
+.st.d0 .tfold-sp{width:0;margin-right:0}
+.tn{position:relative}
+/* the curve into this row: from the parent's caret centre down to mid-row, then
+   across to the caret, or to the label when the row has none */
+.tsub .tn > .st::before{content:"";position:absolute;top:0;height:50%;
+  left:calc(var(--tb) + (var(--d) - 1) * var(--ti) + 6px);width:calc(var(--ti) - 8px);
+  border:solid var(--thread);border-width:0 0 1.5px 1.5px;border-bottom-left-radius:7px;
+  pointer-events:none}
+.tsub .tn > .st.leaf::before{width:calc(var(--ti) + 8px)}
+/* the trunk past this row, down to the next sibling -- through this row's own
+   subtree when it is open, which is why it hangs off the node and not the row */
+.tsub .tn:not(:last-child)::before{content:"";position:absolute;top:0;bottom:0;
+  left:calc(var(--tb) + (var(--d) - 1) * var(--ti) + 6px);
+  border-left:1.5px solid var(--thread);pointer-events:none}
+/* the stub from an open parent's caret down to its first child */
+.st.parent::after{content:"";position:absolute;bottom:0;top:calc(50% + 6px);
+  left:calc(var(--tb) + var(--d) * var(--ti) + 6px);
+  border-left:1.5px solid var(--thread);pointer-events:none}
+body.f-pc [data-fold-row="pc"]::after,body.f-int [data-fold-row="int"]::after,
+body.f-pb [data-fold-row="pb"]::after{display:none}
+.tsub{display:grid;grid-template-rows:1fr;transition:grid-template-rows .22s ease}
+.tsub > div{overflow:hidden;min-height:0}
+body.f-pc .tsub[data-of="pc"],body.f-int .tsub[data-of="int"],
+body.f-pb .tsub[data-of="pb"]{grid-template-rows:0fr}
+body.f-pc [data-fold-row="pc"] .tfold,
+body.f-int [data-fold-row="int"] .tfold,
+body.f-pb [data-fold-row="pb"] .tfold{transform:rotate(-90deg)}
+/* a failed check's name can be long: let it shrink and ellipsise, full name on hover */
+.st.tr.pbf .k{flex:1 1 auto;min-width:0}
+.statwrap{overflow-x:auto;max-height:340px;overflow-y:auto;
+  padding:0 16px 14px}
+table.pstats{border-collapse:collapse;font-size:12.65px;width:100%}
+/* values centred under their headings; padding is symmetric so "centred" means it.
+   The method name stays left -- it is a label, not a value. */
+table.pstats th,table.pstats td{padding:0 5px;height:31px;text-align:center;
+  white-space:nowrap}
+table.pstats th{font-weight:600;color:var(--muted);font-size:11px;
+  position:sticky;top:0;background:var(--panel)}
+table.pstats th.grp{font-weight:700;color:var(--ink);font-size:11.55px}
+table.pstats th.fam{font-size:12.1px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink);text-align:center;
+  border-bottom:1px solid var(--sep)}
+table.pstats th.gs,table.pstats td[data-gs]{border-left:1px solid var(--sep)}
+table.pstats th.grp{text-align:center;border-bottom:1px solid var(--hair);
+  font-weight:700;color:var(--ink)}
+table.pstats td.m,table.pstats th.m{text-align:left;font-weight:500;
+  padding-right:16px}
+table.pstats td{font-variant-numeric:tabular-nums;
+  border-top:1px solid var(--hair)}
+table.pstats tr.refrow td{color:var(--muted);font-style:italic}
+/* rules: under the header, under the reference (the yardstick), under the last row */
+table.pstats tr.refrow td{border-top:1.5px solid var(--rule);border-bottom:1.5px solid var(--rule)}
+table.pstats tbody tr:last-child td{border-bottom:1.5px solid var(--rule)}
+/* the eye beside each method name decides whether it is drawn in the distributions */
+table.pstats .deye{vertical-align:-3px;margin:0 6px 0 -2px}
+table.pstats tr.refrow .deye{font-style:normal}
+table.pstats tr.dimrow td{color:var(--faint)}
+/* distributions: one small chart per metric, every shown method overlaid */
+.dist{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:14px 20px;padding:12px 16px 14px;border-top:1px solid var(--hair)}
+.dcell{min-width:0}
+/* under the plot, centred on the x axis (offset by the y-axis margin), as its title */
+.dfoot{display:flex;align-items:center;justify-content:center;gap:7px;
+  padding-left:38px;margin-top:2px}
+.dfoot select{height:24px;font-size:11.5px;font-weight:600;padding:0 24px 0 8px}
+.dunit{font-size:11px;color:var(--muted)}
+.dplot{width:100%;height:160px}
+.dplot .none{display:flex;align-items:center;justify-content:center;height:100%;
+  color:var(--faint);font-size:11px}
+table.pstats td.na{color:var(--faint)}
+table.pstats td.weak{color:var(--faint);font-style:italic}
+.sechead.fold{display:flex;align-items:center;gap:9px;cursor:pointer;
+  user-select:none;border-radius:var(--r-lg) var(--r-lg) 0 0;
+  transition:padding .28s cubic-bezier(.4,0,.2,1)}
+/* Collapsed, the header IS the panel. Its open-state padding is 14 top / 10 bottom
+   (the content below supplies the rest), which would leave everything centred in
+   it -- the title, Capture all -- 2px above the panel's real centre. Make it
+   symmetric while shut, animated with the fold, and round all four corners. */
+.panel.shut > .sechead.fold{padding-bottom:14px;border-radius:var(--r-lg)}
+.sechead.fold:hover .caret{color:var(--ink)}
+.headtext{min-width:0;flex:1}
+.hdrbtn{display:inline-flex;align-items:center;gap:6px;flex:none;
+  align-self:center;height:28px}
+.hdrbtn svg{display:block}
+.caret{color:var(--faint);line-height:0;flex:none;
+  transition:transform .28s cubic-bezier(.4,0,.2,1),color .15s}
+.panel.shut .caret{transform:rotate(-90deg)}
+aside .caret{transition:transform .3s cubic-bezier(.4,0,.2,1),color .15s}
+select{
+  height:28px;padding:0 26px 0 10px;border:none;border-radius:var(--r-sm);
+  background:var(--fill);color:var(--ink);font-size:12.5px;cursor:pointer;
+  appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%2386868B' stroke-width='1.5' stroke-linecap='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 9px center;
+}
+select:hover{background-color:var(--fill-hi)}
+select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.btn{
+  height:28px;padding:0 12px;border:none;border-radius:var(--r-sm);
+  background:var(--fill);color:var(--ink);font-size:12px;font-weight:500;
+  cursor:pointer;transition:background .15s,color .15s;
+}
+.btn:hover{background:var(--fill-hi)}
+.btn.on{background:var(--accent-tint);color:var(--accent-strong)}
+/* show / hide toggles in the Visualization pane: an eye, then what it shows */
+.eyebtn{display:inline-flex;align-items:center;gap:6px}
+.eyebtn i{display:inline-flex;line-height:0;color:var(--faint)}
+.eyebtn.on i{color:inherit}
+.eyebtn svg{width:15px;height:15px}
+.btn.go{background:var(--accent-strong);color:#fff}
+.btn.go:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:disabled:hover{background:var(--fill)}
+
+/* ------------------------------------------------------------- grid */
+.stage{flex:1;min-height:0;overflow-y:auto;padding:2px 4px 20px}
+/* A fixed number of columns -- set in Settings; more panels add rows rather than
+   shrink the cards. Narrow screens clamp it so a card never collapses to a sliver. */
+/* stretch, not start: every cell in a row takes the row's height, so a reserved
+   slot holds exactly the space a real panel would rather than sitting short */
+.slots{display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));
+  gap:var(--gap);align-items:stretch}
+@media (max-width:900px){.slots{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.slots{grid-template-columns:1fr}}
+
+/* ------------------------------------------------------------- card */
+.card{background:var(--panel);border-radius:var(--r-md);box-shadow:var(--shadow);
+  overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .18s ease}
+.card:hover{box-shadow:var(--shadow-hi)}
+.card .top{display:flex;align-items:center;gap:7px;padding:9px var(--pad);
+  border-bottom:1px solid var(--hair)}
+.card .name{font-weight:600;font-size:12.5px;letter-spacing:-.01em;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card.ref .name{font-weight:500;color:var(--muted)}
+.card .warns{display:flex;gap:4px;flex:none}
+/* step through this method's molecules in the order it generated them -- in the
+   header, between the name and the capture button */
+.card .nav{display:flex;align-items:center;gap:2px;flex:none}
+.card .step{width:26px;height:26px;font-size:20px;line-height:0;
+  padding-bottom:2px}
+.card .step:disabled{opacity:.28;cursor:default}
+.card .pos{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;
+  min-width:44px;text-align:center}
+
+/* A drawn icon, not a glyph: the rounded-square and camera characters are missing
+   from most Linux font stacks and render as nothing at all. */
+/* one box for every icon button, so they sit on the same centre line */
+.iconsq{display:inline-flex;align-items:center;justify-content:center;
+  border:none;background:none;cursor:pointer;color:var(--faint);flex:none;
+  width:24px;height:24px;padding:0;border-radius:7px;line-height:0;
+  transition:color .15s,background .15s}
+.iconsq:hover:not(:disabled){color:var(--accent-strong);background:var(--fill)}
+.iconsq svg{display:block;width:15px;height:15px}
+.card .shot{width:24px;height:24px}
+
+/* the 3D panel is square, inset so the card's corners stay clean */
+.vwrap{position:relative}
+.viewer{width:100%;aspect-ratio:1/1;background:#fff;position:relative}
+/* a method with no structures for the selected pose is greyed out rather than
+   quietly showing a different pose under that label */
+.cover{position:absolute;inset:0;display:none;align-items:center;
+  justify-content:center;background:var(--cover);color:var(--faint);
+  font-size:11px;text-align:center;padding:12px}
+.vwrap.off .cover{display:flex}
+.viewer .msg{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:var(--faint);font-size:11.5px;text-align:center;
+  padding:14px}
+
+/* SMILES sits directly under the 3D panel: scrolls sideways for the whole string,
+   with a copy button pinned at the end */
+/* SMILES + metrics sit BESIDE the 3D panel -- a laptop screen is wide and short,
+   so height is the scarce axis. */
+/* the numbers need far less width than the 3D panel, so the split is not even */
+.cardbody{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.infoclip{overflow:auto;min-width:0;border-left:1px solid var(--hair)}
+.smirow{display:flex;align-items:center;gap:3px;
+  padding:8px 6px 7px 9px;border-bottom:1px solid var(--hair)}
+.smi{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  font-size:10.5px;color:var(--muted);letter-spacing:-.01em;
+  /* thin, and pushed clear of the glyphs it scrolls */
+  padding-bottom:5px}
+.smi::-webkit-scrollbar{height:1.5px}
+.smi::-webkit-scrollbar-track{background:var(--smitrack);border-radius:2px}
+.smi::-webkit-scrollbar-thumb{background:var(--smibar);border-radius:2px}
+.smi:hover::-webkit-scrollbar-thumb{background:var(--smibar-hi)}
+.copy{width:22px;height:22px}
+.copy svg{width:13px;height:13px}
+.copy.done{color:var(--ok)}
+
+/* metric families, read down the column: a quiet group label, then one row per
+   value with the number right-aligned on a shared edge. */
+.stats{padding:4px 0 8px}
+.sgroup{padding:2px 0 4px}
+.sgroup + .sgroup{border-top:1px solid var(--hair);margin-top:2px;padding-top:6px}
+.sgl{font-size:11px;font-weight:700;letter-spacing:.045em;text-transform:uppercase;
+  color:var(--ink);padding:0 9px 3px}
+.st{display:flex;align-items:baseline;justify-content:space-between;gap:6px;
+  padding:1.5px 9px}
+.st .k{font-size:11px;color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.st .v{font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap;
+  letter-spacing:-.01em;flex:none}
+.st .v.na{color:var(--faint)}
+/* PoseBusters verdict: Apple's system green / red, deepened so they stay legible
+   as small text on white. The count rides along muted -- the word is the signal. */
+.st .v.pass{color:var(--ok);font-weight:600}
+.st .v.fail{color:var(--bad);font-weight:600}
+.st .v .frac{color:var(--muted);font-weight:400;margin-left:4px;font-size:10.5px}
+/* Vina dock is the headline; score and min sit behind it. How far behind is a
+   setting, because how much they matter depends on what you are reading for. */
+.st.sec .k,.st.sec .v{color:var(--muted);opacity:var(--sec-op)}
+
+/* reserved, unfilled cells */
+.card.empty{background:var(--empty);box-shadow:none;align-items:center;
+  justify-content:center;min-height:240px;
+  outline:1px dashed rgba(0,0,0,.09);outline-offset:-1px}
+.card.empty:hover{box-shadow:none}
+.card.empty span{color:var(--faint);font-size:11px;font-weight:500}
+
+.warn.info{color:var(--accent-strong);background:var(--accent-tint)}
+.warn{color:#B25000;background:rgba(255,149,0,.14);border-radius:5px;padding:1px 5px;
+  font-size:10px;font-weight:500;flex:none}
+/* values dim while the next pocket's numbers arrive -- the layout never moves */
+body.busy .stats,body.busy .smirow,body.busy .pos{opacity:.45;transition:opacity .1s}
+.loading{color:var(--muted);padding:28px 4px;font-size:12.5px}
+
+/* ------------------------------------------------------------- settings */
+.modal{position:fixed;inset:0;z-index:60;display:none;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.28);backdrop-filter:blur(3px)}
+.modal.open{display:flex}
+/* the inspector: as much screen as there is, the structure taking most of it */
+/* a small dark pill at the top centre that confirms a copy, then fades */
+.toast{position:fixed;top:22px;left:50%;transform:translate(-50%,-8px);z-index:90;
+  background:rgba(0,0,0,.72);color:#fff;font-size:13px;font-weight:500;
+  padding:8px 16px;border-radius:999px;pointer-events:none;opacity:0;
+  backdrop-filter:blur(6px);transition:opacity .18s ease,transform .18s ease}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.modal .box.insp{width:min(2112px,98vw);height:min(1440px,94vh);max-height:none;
+  display:flex;flex-direction:column;padding:14px 16px 16px;overflow:hidden}
+.in-sub{color:var(--muted);font-size:12px;margin-left:10px;font-variant-numeric:tabular-nums}
+.in-ctl{display:flex;align-items:center;gap:8px;margin-right:14px;flex-wrap:wrap}
+.in-ctl .lbl{margin-left:8px}
+.in-cap{margin-right:4px}
+.in-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px;
+  gap:14px;margin-top:8px}
+.in-view{position:relative;min-height:0;background:#fff;border-radius:var(--r-md);
+  overflow:hidden}
+.in-view > #in-view{position:absolute;inset:0}
+.in-cover{display:none}
+.in-view.off .in-cover{display:flex}
+.in-side{min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.in-nav{display:flex;align-items:center;justify-content:center;gap:8px;padding:2px 0}
+.in-nav .step{width:30px;height:30px;font-size:22px;padding-bottom:2px}
+.in-nav .step:disabled{opacity:.28;cursor:default}
+.in-pos{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;
+  min-width:70px;text-align:center}
+.in-smi{border:none;background:var(--fill);border-radius:var(--r-sm);padding:7px 8px}
+.in-metrics .sgroup{padding:4px 0 6px}
+.in-metrics .st{padding:2.5px 4px}
+.in-metrics .st .k{font-size:12px}
+.in-metrics .st .v{font-size:12.5px}
+.in-metrics .sgl{padding:0 4px 3px;font-size:11px}
+.modal .box.wide{width:980px;max-width:calc(100vw - 32px);padding:16px 16px 18px}
+.pi-sub{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  font-size:11px;color:var(--muted);margin:-2px 0 12px;word-break:break-all}
+.pi-views{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;
+  align-items:start;margin-bottom:12px}
+.pi-views figure{margin:0;min-width:0}
+.pi-views figcaption{font-size:11px;color:var(--faint);text-align:center;
+  margin-top:4px}
+/* each half gets a square viewer centred in it, rather than a wide box */
+/* as large as the half allows, but never so tall the facts fall off a laptop */
+.pi-view{width:min(100%,470px,52vh);aspect-ratio:1/1;margin:0 auto;background:#fff;
+  overflow:hidden;position:relative}
+.pi-facts{min-width:0;max-height:34vh;overflow-y:auto;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 26px;
+  align-items:start}
+@media (max-width:720px){.pi-facts{grid-template-columns:1fr}}
+.pi-sec{min-width:0;break-inside:avoid}
+.pi-sec > h4{margin:10px 0 2px;font-size:10.5px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink)}
+.pi-facts table{width:100%;border-collapse:collapse;font-size:12.5px}
+.pi-facts td{padding:6px 0;border-bottom:1px solid var(--hair);vertical-align:top}
+.pi-facts tr:last-child td{border-bottom:none}
+.pi-facts td.k{color:var(--muted);white-space:nowrap;padding-right:14px;width:1%}
+.pi-facts td.v{text-align:right;word-break:break-all;
+  font-variant-numeric:tabular-nums}
+.pi-facts td.v.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  font-size:11px}
+.modal .box{
+  width:430px;max-width:calc(100vw - 32px);max-height:84vh;overflow-y:auto;
+  background:var(--panel);border-radius:var(--r-lg);
+  box-shadow:0 20px 60px rgba(0,0,0,.24);padding:20px 22px 22px;
+}
+.modal h3{margin:0;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.mhead{display:flex;align-items:center;margin-bottom:6px}
+.tabs{display:flex;gap:2px;background:var(--fill);border-radius:9px;padding:2px;
+  margin:10px 0 4px}
+.tab{flex:1;border:none;background:none;cursor:pointer;color:var(--muted);
+  font-size:11.5px;font-weight:600;padding:5px 4px;border-radius:7px;
+  transition:background .15s,color .15s}
+.tab:hover{color:var(--ink)}
+.tab.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.mgroup{margin-top:16px}
+.mgroup[data-tab]{display:none}
+.mgroup[data-tab].show{display:block}
+.mgroup > .t{font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink);margin-bottom:4px}
+.prow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:9px 0;border-bottom:1px solid var(--hair);font-size:12.5px}
+.prow:last-child{border-bottom:none}
+.prow .k{color:var(--muted)}
+.prow .val{display:flex;align-items:center;gap:8px}
+.prow .val b{font-variant-numeric:tabular-nums;font-weight:500;width:34px;
+  text-align:right;color:var(--muted)}
+.olist{border-radius:var(--r-sm);overflow:hidden;background:var(--fill);margin-top:6px}
+.orow{display:flex;align-items:center;gap:9px;padding:6px 10px;font-size:12.5px}
+.orow + .orow{border-top:1px solid var(--hair)}
+.orow .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.orow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.orow .mv{border:none;background:none;cursor:pointer;color:var(--faint);
+  font-size:11px;padding:2px 4px;border-radius:5px;line-height:1}
+.orow .mv:hover:not(:disabled){color:var(--accent-strong);background:var(--panel)}
+.orow .mv:disabled{opacity:.28;cursor:default}
+.orow{cursor:grab}
+.orow.dragging{opacity:.4}
+.orow.over{box-shadow:inset 0 2px 0 var(--accent-strong)}
+.orow .grip{color:var(--faint);font-size:11px;line-height:1;cursor:grab;flex:none}
+.hintline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hintline{color:var(--faint);font-size:11px;margin-top:7px}
+.about{color:var(--faint);font-size:11px;line-height:1.6;padding-top:4px}
+.about b{color:var(--muted);font-weight:500}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#F5F5F7;--muted:#98989D;--faint:#6E6E73;
+    --sep:rgba(255,255,255,.1);--hair:rgba(255,255,255,.07);--rule:rgba(255,255,255,.42);--thread:#48484D;
+    --bg:#000000;--panel:#1C1C1E;--fill:#2C2C2E;--fill-hi:#3A3A3C;
+    --empty:rgba(255,255,255,.03);--cover:#232527;
+    --smibar:rgba(255,255,255,.38);--smibar-hi:rgba(255,255,255,.6);
+    --smitrack:rgba(255,255,255,.09);
+    --accent-tint:rgba(128,146,246,.2);
+    --ok:#30D158;--bad:#FF453A;
+    --shadow:0 1px 3px rgba(0,0,0,.5);
+    --shadow-hi:0 4px 18px rgba(0,0,0,.6);
+  }
+  :root:not([data-theme="light"]) .card.empty{outline-color:rgba(255,255,255,.1)}
+}
+
+:root[data-theme="dark"]{
+    --ink:#F5F5F7;--muted:#98989D;--faint:#6E6E73;
+    --sep:rgba(255,255,255,.1);--hair:rgba(255,255,255,.07);--rule:rgba(255,255,255,.42);--thread:#48484D;
+    --bg:#000000;--panel:#1C1C1E;--fill:#2C2C2E;--fill-hi:#3A3A3C;
+    --empty:rgba(255,255,255,.03);--cover:#232527;
+    --smibar:rgba(255,255,255,.38);--smibar-hi:rgba(255,255,255,.6);
+    --smitrack:rgba(255,255,255,.09);
+    --accent-tint:rgba(128,146,246,.2);
+    --ok:#30D158;--bad:#FF453A;
+    --shadow:0 1px 3px rgba(0,0,0,.5);
+    --shadow-hi:0 4px 18px rgba(0,0,0,.6);
+  }
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] .btn{
+  background:var(--panel);color:var(--ink);border-color:#3A3D40;
+}
+:root[data-theme="dark"] .card.empty{outline-color:rgba(255,255,255,.1)}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <span></span>
+  <h1>Drug Design Viewer</h1>
+  <button class="iconbtn" id="gearbtn" title="Settings">&#9881;</button>
+</div>
+
+<div class="modal" id="settings">
+  <div class="box">
+    <div class="mhead"><h3>Settings</h3><span class="sp"></span>
+      <button class="iconbtn" id="closeset" title="Close">&times;</button></div>
+    <div class="tabs" id="settabs">
+      <button class="tab on" data-tab="display">Display</button>
+      <button class="tab" data-tab="view">3D view</button>
+      <button class="tab" data-tab="methods">Methods</button>
+      <button class="tab" data-tab="capture">Capture</button>
+      <button class="tab" data-tab="about">About</button>
+    </div>
+
+    <div class="mgroup" data-tab="display">
+      <div class="t">Appearance</div>
+      <div class="prow"><span class="k">Theme</span>
+        <span class="val"><select id="theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select></span></div>
+    </div>
+
+    <div class="mgroup" data-tab="display">
+      <div class="t">Layout</div>
+      <div class="prow"><span class="k">Columns</span>
+        <span class="val"><select id="cols"></select></span></div>
+    </div>
+
+    <div class="mgroup" data-tab="view">
+      <div class="t">Representation</div>
+      <div class="prow"><span class="k">Generated ligand sticks</span>
+        <span class="val"><select id="ligr"></select></span></div>
+      <div class="prow"><span class="k">Pocket sticks</span>
+        <span class="val"><select id="pocr"></select></span></div>
+      <div class="prow"><span class="k">Pocket surface opacity</span>
+        <span class="val"><select id="surfr"></select></span></div>
+    </div>
+
+    <div class="mgroup" data-tab="methods">
+      <div class="t">Method order</div>
+      <div class="olist" id="olist"></div>
+      <div class="hintline">
+        <span>Drag a row, or use the arrows. Panels keep this order on every pocket.</span>
+        <button class="btn" id="resetorder">Reset</button>
+      </div>
+    </div>
+
+    <div class="mgroup" data-tab="view">
+      <div class="t">Camera</div>
+      <div class="prow"><span class="k">Sync across panels</span>
+        <span class="val"><button class="btn on" id="tsync">On</button></span></div>
+      <div class="prow"><span class="k">Reset all cameras</span>
+        <span class="val"><button class="btn" id="treset">Reset</button></span></div>
+    </div>
+
+    <div class="mgroup" data-tab="capture">
+      <div class="t">Capture</div>
+      <div class="prow"><span class="k">Resolution</span>
+        <span class="val"><select id="dpi">
+          <option value="150">150 dpi</option>
+          <option value="300" selected>300 dpi</option>
+          <option value="600">600 dpi</option>
+        </select></span></div>
+      <div class="prow"><span class="k">Transparent PNG</span>
+        <span class="val"><button class="btn" id="ttrans">Off</button></span></div>
+    </div>
+
+    <div class="mgroup" data-tab="about">
+      <div class="t">About</div>
+      <div class="about" id="about"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal" id="inspect">
+  <div class="box insp">
+    <div class="mhead">
+      <h3 id="in-title">—</h3>
+      <span class="in-sub" id="in-sub"></span>
+      <span class="sp"></span>
+      <!-- the Visualization pane's own controls, mirrored: one state, drawn twice -->
+      <div class="in-ctl">
+        <span class="lbl">Pose</span>
+        <div class="vgrow" id="in-pose"></div>
+        <span class="lbl">Show</span>
+        <div class="vgrow">
+          <button class="btn eyebtn on" data-show="ref"><i></i><span>Reference ligand</span></button>
+          <button class="btn eyebtn on" data-show="pocket"><i></i><span>Pocket sticks</span></button>
+          <button class="btn eyebtn on" data-show="surface"><i></i><span>Pocket surface</span></button>
+        </div>
+      </div>
+      <button class="iconsq in-cap" id="in-cap" title="Capture this view"></button>
+      <button class="iconbtn" id="in-close" title="Close">&times;</button>
+    </div>
+    <div class="in-body">
+      <div class="in-view"><div id="in-view"></div>
+        <div class="cover in-cover" id="in-cover"><span></span></div></div>
+      <div class="in-side">
+        <div class="in-nav">
+          <button class="iconsq step" id="in-prev" title="Previous molecule">&#8249;</button>
+          <span class="in-pos" id="in-pos">—</span>
+          <button class="iconsq step" id="in-next" title="Next molecule">&#8250;</button>
+        </div>
+        <div class="smirow in-smi">
+          <code class="smi" id="in-smi">—</code>
+          <button class="copy iconsq" id="in-copy" title="Copy SMILES"></button>
+        </div>
+        <div class="in-metrics" id="in-metrics"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="pocketinfo">
+  <div class="box wide">
+    <div class="mhead">
+      <h3 id="pi-title">—</h3><span class="sp"></span>
+      <button class="iconbtn" id="pi-close" title="Close">&times;</button>
+    </div>
+    <div class="pi-sub" id="pi-sub"></div>
+    <div class="pi-views">
+      <figure>
+        <div class="pi-view" id="pi-view"></div>
+        <figcaption>10 &#8491; pocket crop</figcaption>
+      </figure>
+      <figure>
+        <div class="pi-view" id="pi-full"></div>
+        <figcaption id="pi-fullcap">Deposited structure</figcaption>
+      </figure>
+    </div>
+    <div class="pi-facts" id="pi-facts"></div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <aside class="panel" id="rail">
+    <div class="sechead fold" id="railhead">
+      <span class="headtext">
+        <h2>Pockets <span class="count" id="pocksub"></span></h2>
+      </span>
+      <span class="caret">
+        <svg viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
+          <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor"
+                stroke-width="1.6" stroke-linecap="round"/></svg>
+      </span>
+    </div>
+    <div class="railList" id="pockrows"></div>
+  </aside>
+
+  <main>
+    <section class="panel" id="vizsec">
+      <div class="sechead fold" id="vizhead">
+        <span class="caret"><svg viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        <span class="headtext">
+          <h2 id="viztitle">Visualization</h2>
+          <span class="sub" id="vizsub"></span>
+        </span>
+        <button class="btn go hdrbtn" id="capall"
+                title="Capture every panel as one image"><svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5h3l1.2-2h6.6l1.2 2h3v10h-15z"/><circle cx="10" cy="11" r="3.2"/></svg><span>Capture all</span></button>
+      </div>
+      <div class="vizwrap"><div class="vizclip">
+        <div class="vizgrid">
+          <div class="vg">
+            <div class="lbl"><span>Pose</span></div>
+            <div class="vgrow" id="poserow"></div>
+          </div>
+          <div class="vg">
+            <div class="lbl"><span>Show</span></div>
+            <div class="vgrow">
+              <button class="btn eyebtn on" data-show="ref"><i></i><span>Reference ligand</span></button>
+              <button class="btn eyebtn on" data-show="pocket"><i></i><span>Pocket sticks</span></button>
+              <button class="btn eyebtn on" data-show="surface"><i></i><span>Pocket surface</span></button>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </section>
+
+    <section class="panel" id="statsec">
+      <div class="sechead fold" id="stathead">
+        <span class="caret"><svg viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        <span class="headtext">
+          <h2>Pocket statistics</h2>
+        </span>
+      </div>
+      <div class="vizwrap"><div class="vizclip">
+        <div class="statwrap"><table class="pstats" id="pstats"></table></div>
+        <div class="dist" id="dist"></div>
+      </div></div>
+    </section>
+
+    <div class="stage">
+      <div class="slots" id="slots"><div class="loading">loading…</div></div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+const DEFAULT_COLS = 3;          // columns in the panel grid; settable
+// The order panels appear in. Anything not listed follows, in manifest order.
+const DEFAULT_ORDER = ["AR", "Pocket2Mol", "TargetDiff", "DecompDiff",
+                       "DecompDiff-prior25", "DiffSBDD", "FuncBind"];
+const CSS_DPI = 96;              // a CSS pixel is 1/96 in
+const S = {
+  man:null, data:null, target:null, colIdx:{}, metrics:{},
+  cards:{}, syncing:false, token:0, resetCam:true,
+  poses:[], pose:"generated", cols:DEFAULT_COLS, custom:[], dragFrom:null,
+  show:{ref:true, pocket:true, surface:true},
+  distKeys:["vina_dock", "qed", "sa", "n_atoms"], distOff:new Set(),
+  fold:{pc:true, int:false, pb:false},
+  contactTypes:{hydrogenBond:true, hydrophobic:true, piStacking:true, cationPi:true,
+                ionicInteraction:true, halogenBond:true, metalCoordination:true},
+  // refOpacity is fixed: pale enough to stay behind the generated ligand
+  style:{lig:0.2, poc:0.1, surf:0.2, refOpacity:0.4}, surfBuilt:false,
+  sync:true, dpi:300, transparent:false,
+};
+const $ = id => document.getElementById(id);
+const fmt = (v,d) => (v===null||v===undefined) ? "—" : v.toFixed(d);
+
+// Vina Dock is the headline number; score and min are the run-up to it.
+// Drawn, not a glyph: U+25A2 and the camera emoji are absent from most Linux
+// font stacks, so the button rendered as an empty space.
+const COPY = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+  '<rect x="7" y="7" width="9" height="10" rx="2"/>' +
+  '<path d="M13 4.5H6a2 2 0 0 0-2 2V14"/></svg>';
+const CHECK = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+  'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M4 10.5l4 4 8-9"/></svg>';
+const LOUPE = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+  '<circle cx="8.5" cy="8.5" r="5"/><path d="M12.3 12.3L17 17"/></svg>';
+const CAMERA = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M2.5 6.5h3l1.2-2h6.6l1.2 2h3v10h-15z"/>' +
+  '<circle cx="10" cy="11" r="3.2"/></svg>';
+const SECONDARY = new Set(["vina_score", "vina_min"]);
+// the reference ghost is nearly as thick as the ligand it sits behind -- the two are
+// there to be compared -- and is set back by colour and transparency instead
+const REF_THIN = 0.9;
+const GROUPS = [
+  {label:"Vina",    items:[["vina_score","score"],["vina_min","min"],["vina_dock","dock"]]},
+  {label:"Quality", items:[["qed","QED"],["sa","SA"],["n_atoms","atoms"]]},
+  {label:"Pose",    tree:true},
+];
+
+// ---------------------------------------------------------------- bootstrap
+async function boot(){
+  const m = await (await fetch("data/manifest.json")).json();
+  S.man = m;
+  m.metrics.forEach(x => S.metrics[x.key] = x);
+  m.cols.forEach((c,i) => S.colIdx[c] = i);
+
+  $("pocksub").textContent = `(${m.targets.length})`;
+
+  document.querySelectorAll("[data-show]").forEach(b =>
+    b.onclick = () => toggleShow(b.dataset.show));
+  paintShow();
+  // the charts are drawn at their pixel width, so redraw when it changes
+  let distW = 0;
+  new ResizeObserver(es => {
+    const w = Math.round(es[0].contentRect.width);
+    if (w && w !== distW){ distW = w; renderDist(); }
+  }).observe($("dist"));
+  for (const [f, open] of Object.entries(S.fold))
+    document.body.classList.toggle("f-" + f, !open);
+  bindChoice("ligr", "lig", 0.5);
+  bindChoice("pocr", "poc", 0.5);
+  bindChoice("surfr", "surf", 1.0);
+
+  $("gearbtn").onclick = () => $("settings").classList.add("open");
+  const shut = () => $("settings").classList.remove("open");
+  $("closeset").onclick = shut;
+  const shutInspect = () => { $("inspect").classList.remove("open");
+                              S.insp = null; S.inspReps = null; };
+  $("in-close").onclick = shutInspect;
+  $("inspect").onclick = e => { if (e.target === $("inspect")) shutInspect(); };
+  $("in-prev").onclick = () => stepInspect(-1);
+  $("in-next").onclick = () => stepInspect(+1);
+  $("in-copy").innerHTML = COPY;
+  $("in-copy").onclick = () => {
+    const smi = $("in-smi").textContent;
+    if (!smi || smi === "—") return;
+    const ok = () => { toast("Copied!"); $("in-copy").innerHTML = CHECK;
+                       setTimeout(() => $("in-copy").innerHTML = COPY, 1100); };
+    if (navigator.clipboard && window.isSecureContext)
+      navigator.clipboard.writeText(smi).then(ok, () => legacyCopy(smi) && ok());
+    else if (legacyCopy(smi)) ok();
+  };
+  $("in-cap").innerHTML = CAMERA;
+  $("in-cap").onclick = async () => {
+    if (!S.inspStage || !S.insp) return;
+    const png = await withDpi(await shoot(S.inspStage), S.dpi);
+    save(png, `${S.target}_${S.insp.label}_mol${S.insp.i + 1}_${S.dpi}dpi.png`);
+  };
+  window.addEventListener("resize", () => S.inspStage && S.inspStage.handleResize());
+  const shutInfo = () => $("pocketinfo").classList.remove("open");
+  $("pi-close").onclick = shutInfo;
+  $("pocketinfo").onclick = e => { if (e.target === $("pocketinfo")) shutInfo(); };
+  /* The settings are grouped by kind; the tabs show one group at a time so the
+     modal never becomes a scroll. */
+  const showTab = name => {
+    document.querySelectorAll("#settabs .tab").forEach(b =>
+      b.classList.toggle("on", b.dataset.tab === name));
+    document.querySelectorAll(".mgroup[data-tab]").forEach(g =>
+      g.classList.toggle("show", g.dataset.tab === name));
+  };
+  document.querySelectorAll("#settabs .tab").forEach(b => {
+    b.onclick = () => showTab(b.dataset.tab);
+  });
+  showTab("display");
+  $("settings").onclick = e => { if (e.target === $("settings")) shut(); };
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape"){
+      shut(); $("pocketinfo").classList.remove("open");
+      $("inspect").classList.remove("open"); S.insp = null;
+    }
+    if (S.insp && $("inspect").classList.contains("open")){
+      if (e.key === "ArrowLeft") stepInspect(-1);
+      if (e.key === "ArrowRight") stepInspect(+1);
+    }
+  });
+
+  $("resetorder").onclick = resetOrder;
+  $("tsync").onclick = () => {
+    S.sync = !S.sync;
+    $("tsync").classList.toggle("on", S.sync);
+    $("tsync").textContent = S.sync ? "On" : "Off";
+  };
+  $("treset").onclick = () => liveStages().forEach(s => frameStage(s, 400));
+
+  $("dpi").onchange = () => S.dpi = parseInt($("dpi").value, 10);
+  $("ttrans").onclick = () => {
+    S.transparent = !S.transparent;
+    $("ttrans").classList.toggle("on", S.transparent);
+    $("ttrans").textContent = S.transparent ? "On" : "Off";
+  };
+  $("capall").onclick = e => { e.stopPropagation(); captureAll(); };
+  $("vizhead").onclick = () => $("vizsec").classList.toggle("shut");
+  $("stathead").onclick = () => $("statsec").classList.toggle("shut");
+  // Collapsed, the whole rail is the target -- a 40px strip is too small to ask
+  // someone to hit the title exactly. Expanded, only the header folds it.
+  $("rail").addEventListener("click", e => {
+    const shut = document.body.classList.contains("railshut");
+    if (!shut && !e.target.closest("#railhead")) return;
+    document.body.classList.toggle("railshut");
+    // the cards just changed width; tell the canvases once the track has settled
+    setTimeout(() => liveStages().forEach(s => s.handleResize()), 340);
+  });
+  const theme = $("theme");
+  theme.value = loadTheme();
+  applyTheme(theme.value);
+  theme.onchange = () => {
+    applyTheme(theme.value);
+    try { localStorage.setItem(LS_THEME, theme.value); } catch(e){}
+  };
+
+  const cols = $("cols");
+  for (let n = 2; n <= 8; n++){
+    const o = document.createElement("option");
+    o.value = n; o.textContent = `${n} columns`;
+    cols.appendChild(o);
+  }
+  cols.value = S.cols;
+  cols.onchange = () => { setCols(parseInt(cols.value, 10)); };
+  setCols(S.cols);
+  buildPoseRow();
+
+  // Provenance moves into Settings rather than off the page: which receptor the
+  // numbers were scored against is the kind of thing that has silently mixed before.
+  const p = m.protocol || {};
+  $("about").innerHTML =
+    `<div><b>Protocol.</b> ${p.receptor||""} · ${p.pocket_set||""}</div>` +
+    `<div><b>Reference Vina.</b> ${p.reference_vina||"—"}</div>` +
+    `<div><b>Source.</b> ${m.source} · built on ${m.generated_on} at ${m.generated_at}` +
+    (m.note ? ` · ${m.note}` : "") + `</div>`;
+
+  loadOrder();
+  renderOrderList();
+  renderPockets();
+  selectTarget(m.targets[0].target);
+}
+
+function bindChoice(id, key, max){
+  /* 0.1 steps: fine enough to tune and coarse enough to pick deliberately. 0 is
+     "off", which is why there is no separate toggle for these three. */
+  const el = $(id);
+  el.innerHTML = "";
+  for (let v = 0; v <= max + 1e-9; v += 0.1){
+    const r = Math.round(v * 10) / 10;
+    const o = document.createElement("option");
+    o.value = r;
+    o.textContent = r === 0 ? "Off" : r.toFixed(1);
+    el.appendChild(o);
+  }
+  el.value = S.style[key];
+  el.onchange = () => {
+    const was = S.style[key];
+    S.style[key] = parseFloat(el.value);
+    /* Radius and opacity are live parameters on representations that already exist,
+       so a change restyles instead of reloading. The exception is a representation
+       that was never built because it was off. */
+    if (was === 0 && S.style[key] > 0) render();
+    else applyStyle();
+  };
+}
+
+function applyStyle(){
+  const scenes = Object.values(S.cards || {}).map(c => c.reps);
+  if (S.insp) scenes.push(S.inspReps);            // the inspector follows the pane
+  for (const reps of scenes){
+    const r = reps || {};
+    const set = (rep, params, vis) => {
+      if (!rep) return;
+      try { if (params) rep.setParameters(params); rep.setVisibility(vis); } catch(e){}
+    };
+    set(r.lig,       {radius: S.style.lig},  S.style.lig > 0);
+    set(r.pocStick,  {radius: S.style.poc},  S.show.pocket && S.style.poc > 0);
+    set(r.pocCartoon, null,                  S.show.pocket && S.style.poc > 0);
+    set(r.surf,      {opacity: S.style.surf}, S.show.surface && S.style.surf > 0);
+    set(r.ref, {radius: S.style.lig * REF_THIN, opacity: S.style.refOpacity}, S.show.ref);
+  }
+}
+
+/* Show / hide is visibility only: the representation stays built, so turning it back
+   on is instant and the camera never moves. Thickness and opacity live in Settings.
+   The same switches appear in the pane and in the inspector; both are drawn from
+   S.show, so flipping either moves the other and every panel. */
+function toggleShow(key){
+  S.show[key] = !S.show[key];
+  paintShow();
+  applyStyle();
+}
+function paintShow(){
+  document.querySelectorAll("[data-show]").forEach(el => {
+    const on = !!S.show[el.dataset.show];
+    el.classList.toggle("on", on);
+    el.querySelector("i").innerHTML = on ? EYE_OPEN : EYE_SHUT;
+    el.title = (on ? "Hide " : "Show ") + el.textContent.trim().toLowerCase();
+  });
+}
+
+// ---------------------------------------------------------------- method order
+/* Two ways to lay the panels out: ranked by the chosen metric (the default, which
+   answers "who won this pocket"), or a fixed order you arrange yourself (which keeps
+   a method in the same place as you click through pockets, so the eye can compare).
+   The custom order is remembered per browser; storage can be blocked, so every
+   access is guarded and a failure just means the default order. */
+const LS_KEY = "ddviewer.methodOrder.v1";
+const LS_THEME = "ddviewer.theme.v1";
+
+function loadTheme(){
+  try { return localStorage.getItem(LS_THEME) || "system"; }
+  catch(e){ return "system"; }
+}
+
+function applyTheme(mode){
+  /* "system" removes the attribute so the prefers-color-scheme query decides; the
+     other two pin it. NGL renders on a white canvas either way. */
+  const r = document.documentElement;
+  if (mode === "system") r.removeAttribute("data-theme");
+  else r.setAttribute("data-theme", mode);
+}
+
+function loadOrder(){
+  S.custom = DEFAULT_ORDER.filter(n => S.man.methods.some(m => m.name === n))
+    .concat(S.man.methods.map(m => m.name)
+      .filter(n => !DEFAULT_ORDER.includes(n)));
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw){
+      const o = JSON.parse(raw);
+      if (Array.isArray(o.order)){
+        const known = new Set(S.custom);
+        const kept = o.order.filter(n => known.has(n));
+        S.custom = kept.concat(S.custom.filter(n => !kept.includes(n)));
+      }
+    }
+  } catch(e){ /* private window, blocked storage -- the default order is fine */ }
+}
+
+function saveOrder(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({order:S.custom})); }
+  catch(e){ /* nothing to do; the session still honours the choice */ }
+}
+
+function resetOrder(){
+  S.custom = DEFAULT_ORDER.filter(n => S.man.methods.some(m => m.name === n))
+    .concat(S.man.methods.map(m => m.name).filter(n => !DEFAULT_ORDER.includes(n)));
+  saveOrder(); renderOrderList(); render();
+}
+
+function moveMethod(from, to){
+  if (from === to || from == null || to == null) return;
+  if (from < 0 || to < 0 || from >= S.custom.length || to >= S.custom.length) return;
+  const [m] = S.custom.splice(from, 1);
+  S.custom.splice(to, 0, m);
+  saveOrder(); renderOrderList(); render();
+}
+
+function renderOrderList(){
+  /* Drag a row, or nudge it with the arrows -- both land in the same place. The order
+     is fixed, never derived from a score, so a method stays put as you click through
+     pockets and the eye can compare the same cell across them. */
+  const host = $("olist");
+  host.innerHTML = "";
+  const color = {};
+  S.man.methods.forEach(m => color[m.name] = m.color);
+  S.custom.forEach((name, i) => {
+    const row = document.createElement("div");
+    row.className = "orow";
+    row.draggable = true;
+    row.innerHTML =
+      `<span class="grip" aria-hidden="true">⠿</span>` +
+      `<span class="dot" style="background:${color[name]||"#999"}"></span>` +
+      `<span class="nm">${name}</span>`;
+    row.ondragstart = e => {
+      S.dragFrom = i;
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", name); } catch(_){}
+      row.classList.add("dragging");
+    };
+    row.ondragend = () => {
+      S.dragFrom = null;
+      host.querySelectorAll(".orow").forEach(r =>
+        r.classList.remove("dragging", "over"));
+    };
+    row.ondragover = e => { e.preventDefault(); e.dataTransfer.dropEffect = "move";
+                            row.classList.add("over"); };
+    row.ondragleave = () => row.classList.remove("over");
+    row.ondrop = e => { e.preventDefault(); row.classList.remove("over");
+                        moveMethod(S.dragFrom, i); };
+    const mk = (txt, delta, disabled) => {
+      const b = document.createElement("button");
+      b.className = "mv"; b.innerHTML = txt; b.disabled = disabled;
+      b.title = "Move";
+      b.onclick = () => moveMethod(i, i + delta);
+      return b;
+    };
+    row.append(mk("&#9650;", -1, i === 0), mk("&#9660;", +1, i === S.custom.length - 1));
+    host.appendChild(row);
+  });
+}
+
+// ---------------------------------------------------------------- statistics
+/* Three families, the same three the panels use. Each family's columns sit under its
+   own heading, and the counts that belong to a family (Vina n, PB pass) sit inside it
+   rather than floating at the edges. */
+const STAT_GROUPS = [
+  {label:"Vina", lead:["Vina n", "how many of this method's molecules have a Vina score"],
+   cols:[["vina_score","Score"], ["vina_min","Min"], ["vina_dock","Dock"]],
+   tail:["High aff.", "TargetDiff: share of docked molecules with Vina dock <= the " +
+         "reference's. Greyed when fewer than 50 were docked -- TargetDiff leaves " +
+         "such a pocket out of its average.", "ha"]},
+  // QED and SA follow TargetDiff (RDKit QED; SA normalised as (10 - SA) / 9).
+  // Diversity is a property of the SET: its mean is TargetDiff's number exactly.
+  {label:"Molecule quality",
+   cols:[["qed","QED"], ["sa","SA"], ["n_atoms","Heavy atoms"],
+         ["diversity","Diversity", "set"]]},
+  {label:"PoseCheck",
+   cols:[["clashes","Clashes"], ["strain","Strain"], ["n_interactions","Interactions"],
+         ["rmsd_dock","Redock RMSD"]]},
+  // "PB": the full name as a header made this one-column family the widest in the table
+  {label:"PB", title:"PoseBusters", tail:["pass", "share passing all 22 PoseBusters checks", "pb"],
+   cols:[]},
+];
+const STAT_COLS = STAT_GROUPS.flatMap(g => g.cols);
+// digits per column -- counts are integers, the rest read better at two places
+const STAT_DIGITS = {n_atoms:1, clashes:1, strain:0, n_interactions:1};
+// Torsional strain has a long tail -- single conformers come back at 1e10 -- so the
+// mean is meaningless. The bundle flags it as strain_mean_UNRELIABLE; we show the
+// median alone rather than print a number nobody should quote.
+const MEDIAN_ONLY = new Set(["strain"]);
+
+function meanOf(a){ return a.length ? a.reduce((x,y) => x+y, 0) / a.length : null; }
+function medianOf(a){
+  if (!a.length) return null;
+  const s = a.slice().sort((x,y) => x-y), h = s.length >> 1;
+  return s.length % 2 ? s[h] : (s[h-1] + s[h]) / 2;
+}
+
+function renderStats(){
+  /* Mean and median over every molecule this method produced for THIS pocket. The
+     Vina count is its own column because coverage is not the same as the molecule
+     count -- TargetDiff's docking pass scored a different set from its pose pass,
+     so a mean over 39 of 96 must not look like a mean over 96. */
+  const t = $("pstats");
+  if (!S.data){ t.innerHTML = ""; return; }
+  // row 1: the families · row 2: the metrics · row 3: mean / median
+  // the eye in the corner shows or hides every row's curve at once; it is open while
+  // anything is drawn, like the interactions eye on a panel
+  const everyone = ["Reference", ...pickRows().map(p => p.name)];
+  const anyOn = everyone.some(n => !S.distOff.has(n));
+  const allEye = `<button class="ceye deye${anyOn ? " on" : ""}" data-all="1" ` +
+    `style="--ec:var(--ink)" title="${anyOn ? "Hide" : "Show"} every curve in the distributions">` +
+    `${anyOn ? EYE_OPEN : EYE_SHUT}</button>`;
+  // Method and n sit on the third header row, level with "mean / median"
+  let r1 = '<tr><th class="m" rowspan="2"></th><th rowspan="2"></th>';
+  let r2 = "<tr>", r3 = `<tr><th class="m">${allEye}Method</th><th>n</th>`;
+  for (const g of STAT_GROUPS){
+    const span = (g.lead ? 1 : 0) + 2 * g.cols.length + (g.tail ? 1 : 0);
+    r1 += `<th class="fam gs" colspan="${span}"${g.title ? ` title="${g.title}"` : ""}>${g.label}</th>`;
+    let first = true;
+    const gs = () => { const c = first ? " gs" : ""; first = false; return c; };
+    if (g.lead) r2 += `<th class="${gs().trim()}" rowspan="2" title="${g.lead[1]}">${g.lead[0]}</th>`;
+    g.cols.forEach(([, lab], j) => {
+      r2 += `<th class="grp${gs()}" colspan="2">${lab}</th>`;
+      // a family with no lead column starts in row 3 too, and the cell left of it
+      // spans rows 2-3, so its divider has to come from this row's own first cell
+      r3 += `<th${!g.lead && j === 0 ? ' class="gs"' : ""}>mean</th><th>median</th>`;
+    });
+    // a family that is only its tail column takes the divider on that column
+    if (g.tail) r2 += `<th${!g.lead && !g.cols.length ? ' class="gs"' : ""} rowspan="2" ` +
+                      `title="${g.tail[1]}">${g.tail[0]}</th>`;
+  }
+  let head = `<thead>${r1}</tr>${r2}</tr>${r3}</tr></thead>`;
+
+  const cell = (v, d) => v === null || v === undefined
+    ? '<td class="na">—</td>' : `<td>${v.toFixed(d)}</td>`;
+
+  const row = (name, rows, cls) => {
+    const dock = rows.map(r => r[S.colIdx.vina_dock]).filter(v => v !== null);
+    // the eye is the charts' legend, so it wears the chart colour
+    const col = name === "Reference" ? "var(--ink)" : distColor(name);
+    const on = !S.distOff.has(name);
+    const eye = `<button class="ceye deye${on ? " on" : ""}" data-m="${name}" ` +
+      `style="--ec:${col}" title="${on ? "Hide" : "Show"} ${name} in the distributions">` +
+      `${on ? EYE_OPEN : EYE_SHUT}</button>`;
+    let s = `<tr class="${cls}${on ? "" : " dimrow"}"><td class="m">${eye}${name}</td><td>${rows.length}</td>`;
+    for (const g of STAT_GROUPS){
+      let first = true;
+      const gs = html => { if (!first) return html; first = false;
+                           return html.replace("<td", '<td data-gs="1"'); };
+      if (g.lead) s += gs(`<td>${dock.length}</td>`);
+      for (const [k, , kind] of g.cols){
+        const d = STAT_DIGITS[k] ?? 2;
+        if (kind === "set"){
+          const st = ((S.data.setstats || {})[name] || {})[k] || {};
+          const tip = name === "Reference" ? ' title="one molecule has no diversity"' : "";
+          s += gs(st.mean === null || st.mean === undefined
+                    ? `<td class="na"${tip}>—</td>` : cell(st.mean, d));
+          s += (st.median === null || st.median === undefined)
+                    ? `<td class="na"${tip}>—</td>` : cell(st.median, d);
+          continue;
+        }
+        const v = rows.map(r => r[S.colIdx[k]]).filter(x => x !== null);
+        s += gs(MEDIAN_ONLY.has(k)
+          ? '<td class="na" title="the mean is dominated by outliers; use the median">—</td>'
+          : cell(meanOf(v), d));
+        s += cell(medianOf(v), d);
+      }
+      if (g.tail && g.tail[2] === "pb"){
+        const pb = rows.map(r => r[S.colIdx.pb_valid]).filter(v => v !== null);
+        s += gs(pb.length
+          ? `<td>${(100 * pb.filter(Boolean).length / pb.length).toFixed(0)}%</td>`
+          : '<td class="na">—</td>');
+      } else if (g.tail && g.tail[2] === "ha"){
+        const ha = ((S.data.setstats || {})[name] || {}).high_affinity || {};
+        if (ha.share === null || ha.share === undefined){
+          s += `<td class="na"${name === "Reference"
+                 ? ' title="the reference is the yardstick, not a contender"' : ""}>—</td>`;
+        } else {
+          const pct = `${(100 * ha.share).toFixed(0)}%`;
+          s += ha.eligible
+            ? `<td>${pct}</td>`
+            : `<td class="weak" title="only ${ha.n_docked} docked (< 50): TargetDiff ` +
+              `excludes this pocket from its average">${pct}</td>`;
+        }
+      }
+    }
+    return s + "</tr>";
+  };
+
+  let body = "<tbody>";
+  // the crystal pose first: it is the yardstick the rest are read against
+  const r = S.data.reference;
+  if (r && r.smiles){
+    body += row("Reference",
+                [S.man.cols.map(c => (c === "i") ? -1
+                   : (c === "smiles") ? r.smiles
+                   : (r[c] === undefined ? null : r[c]))],
+                "refrow");
+  }
+  for (const p of pickRows()) body += row(p.name, p.rows || [], "");
+  t.innerHTML = head + body + "</tbody>";
+  t.querySelectorAll(".deye").forEach(b => b.onclick = () => {
+    if (b.dataset.all){
+      if (anyOn) everyone.forEach(n => S.distOff.add(n));
+      else S.distOff.clear();
+    } else {
+      const n = b.dataset.m;
+      S.distOff.has(n) ? S.distOff.delete(n) : S.distOff.add(n);
+    }
+    renderStats();
+  });
+  renderDist();
+}
+
+// ---------------------------------------------------------------- distributions
+/* Every molecule this pocket produced, per method, as a density curve -- the shape
+   the mean and median in the table hide. Curves are Gaussian KDEs (Scott's bandwidth)
+   scaled to unit area, so a method with 21 molecules and one with 100 are drawn on
+   the same footing. The x range is the pooled 1st-99th percentile of what is shown:
+   strain alone reaches 1e10, and one such value would flatten every other curve. */
+const DIST_CHOICES = ["vina_dock", "vina_min", "vina_score", "qed", "sa", "n_atoms",
+                      "clashes", "strain", "n_interactions", "rmsd_dock"];
+const DIST_DISCRETE = new Set(["n_atoms", "clashes", "n_interactions"]);
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function quantile(sorted, q){
+  if (!sorted.length) return null;
+  const i = (sorted.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+function niceTicks(lo, hi, n){
+  const raw = (hi - lo) / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(st => st >= raw) || raw;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step)
+    out.push(+v.toFixed(10));
+  return {ticks: out, step};
+}
+function kde(vals, lo, hi, h, n){
+  const xs = [], ys = [], k = 1 / (vals.length * h * Math.sqrt(2 * Math.PI));
+  for (let i = 0; i < n; i++){
+    const x = lo + (hi - lo) * i / (n - 1);
+    let y = 0;
+    for (const v of vals){ const z = (x - v) / h; y += Math.exp(-0.5 * z * z); }
+    xs.push(x); ys.push(y * k);
+  }
+  return {xs, ys};
+}
+
+/* TEMPORARY pastel set for the charts, until the project palette exists -- swap it
+   here and nowhere else. A method missing from it gets its panel colour washed
+   toward white. */
+const DIST_PALETTE = {
+  "AR": "#B9A3E3", "Pocket2Mol": "#F6B987", "TargetDiff": "#8EC5EA",
+  "DecompDiff": "#8C9BB0", "DecompDiff-prior25": "#F2A7C8", "DiffSBDD": "#F29E98",
+  "FuncBind": "#86D0B8",
+};
+function distColor(name){
+  if (DIST_PALETTE[name]) return DIST_PALETTE[name];
+  const m = (S.man.methods || []).find(x => x.name === name);
+  const [r, g, b] = rgb01((m && m.color) || "#888888").map(v => Math.round((v * 0.55 + 0.45) * 255));
+  return `rgb(${r},${g},${b})`;
+}
+
+// every method, hidden ones included: the frame is fixed by all of them, so
+// toggling an eye only adds or removes a curve and never moves the axes
+function distSeries(k){
+  const col = S.colIdx[k];
+  return pickRows().map(p => ({
+    name: p.name, color: distColor(p.name), off: S.distOff.has(p.name),
+    vals: (p.rows || []).map(r => r[col])
+      .filter(v => v !== null && v !== undefined && isFinite(v)),
+  }));
+}
+
+function renderDist(){
+  const host = $("dist");
+  if (!host || !S.data) return;
+  const keys = S.distKeys.filter(k => S.colIdx[k] !== undefined);
+  if (host.children.length !== keys.length){
+    host.innerHTML = keys.map((k, i) =>
+      `<div class="dcell"><div class="dplot"></div>` +
+      `<div class="dfoot"><select data-i="${i}">` +
+      DIST_CHOICES.filter(c => S.metrics[c]).map(c =>
+        `<option value="${c}">${S.metrics[c].label}</option>`).join("") +
+      `</select><span class="dunit"></span></div></div>`).join("");
+    host.querySelectorAll("select").forEach(sel => sel.onchange = () => {
+      S.distKeys[+sel.dataset.i] = sel.value;
+      renderDist();
+    });
+  }
+  keys.forEach((k, i) => {
+    const cell = host.children[i];
+    cell.querySelector("select").value = k;
+    // only a real unit; scores and counts show nothing
+    cell.querySelector(".dunit").textContent = (S.metrics[k] || {}).unit || "";
+    drawDist(cell.querySelector(".dplot"), k);
+  });
+}
+
+function cssVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+// Plotly needs rgba for a translucent fill; the palette is hex and the fallback is rgb()
+function withAlpha(col, a){
+  const hex = /^#([0-9a-f]{6})$/i.exec(col);
+  if (hex){
+    const n = parseInt(hex[1], 16);
+    return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const rgb = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(col);
+  return rgb ? `rgba(${rgb[1]},${rgb[2]},${rgb[3]},${a})` : col;
+}
+function distMessage(div, text){
+  if (window.Plotly && div._fullLayout) Plotly.purge(div);
+  div.innerHTML = `<div class="none">${text}</div>`;
+}
+
+/* Drawn with Plotly so hovering a curve reads out the method and the value under the cursor
+   (plus density, n, mean, median); the median ticks and the reference line answer too. The
+   frame logic is unchanged: fixed axes over every method, shown or not. */
+function drawDist(div, k){
+  const W = Math.max(200, div.clientWidth || 300), H = 160;
+  // nothing sits above the top tick -- the axis title runs up the left side and the
+  // "ref" label hangs inside the frame -- so the chart never reaches into its header
+  const m = {l: 46, r: 8, t: 6, b: 20};
+  const iw = W - m.l - m.r;
+  const label = (S.metrics[k] || {}).label || k;
+  if (!window.Plotly) return distMessage(div, "chart library did not load");
+  const all = distSeries(k).filter(x => x.vals.length);
+  const r = S.data.reference || {};
+  const refRaw = (r[k] !== null && r[k] !== undefined && isFinite(r[k])) ? r[k] : null;
+  const refV = S.distOff.has("Reference") ? null : refRaw;
+  const pooled = all.flatMap(x => x.vals).sort((a, b) => a - b);
+  if (!pooled.length) return distMessage(div, `no ${label} for this pocket`);
+  // x: pooled 1st-99th percentile over EVERY method (and the reference), shown or not
+  let lo = pooled.length >= 20 ? quantile(pooled, 0.01) : pooled[0];
+  let hi = pooled.length >= 20 ? quantile(pooled, 0.99) : pooled[pooled.length - 1];
+  if (refRaw !== null){ lo = Math.min(lo, refRaw); hi = Math.max(hi, refRaw); }
+  if (hi - lo < 1e-9){ lo -= 0.5; hi += 0.5; }
+  const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+
+  const hMin = Math.max((hi - lo) / 60, DIST_DISCRETE.has(k) ? 0.6 : 0);
+  const curves = all.map(x => {
+    const n = x.vals.length, mean = x.vals.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(x.vals.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1));
+    const bw = Math.max(hMin, 1.06 * (sd || 0) * Math.pow(n, -0.2));
+    const sorted = x.vals.slice().sort((a, b) => a - b);
+    return Object.assign(kde(x.vals, lo, hi, bw, 120), x,
+      {n, mean, bw, median: quantile(sorted, 0.5)});
+  });
+  // y: the tallest curve of ALL methods, for the same reason
+  const ytop = Math.max(...curves.map(c => Math.max(...c.ys))) || 1;
+  const yt = niceTicks(0, ytop, 3);
+  const ymax = Math.ceil(ytop / yt.step - 1e-9) * yt.step;   // round UP to a tick
+  yt.ticks = [];
+  for (let v = 0; v <= ymax + yt.step * 1e-9; v += yt.step) yt.ticks.push(+v.toFixed(10));
+  const shown = curves.filter(c => !c.off);
+  const d = (S.metrics[k] || {}).digits ?? 2;
+  // as many decimals as the step itself has: 0.25 needs two, 2.5 one, 5 none
+  const tickDigits = step => {
+    const t = String(+step.toPrecision(6));
+    return t.includes(".") ? Math.min(3, t.split(".")[1].length) : 0;
+  };
+  const xt = niceTicks(lo, hi, Math.max(3, Math.round(iw / 70)));
+  const xd = tickDigits(xt.step), yd = tickDigits(yt.step);
+
+  const ink = cssVar("--ink") || "#1D1D1F", muted = cssVar("--muted") || "#86868B";
+  const faint = cssVar("--faint") || "#AEAEB2", panel = cssVar("--panel") || "#FFFFFF";
+  const hover = col => ({bgcolor: panel, bordercolor: col, font: {color: ink, size: 11}});
+  const esc = t => String(t).replace(/[<>&]/g, ch => ({"<": "&lt;", ">": "&gt;", "&": "&amp;"}[ch]));
+  const lab = esc(label);
+
+  // a pastel fill under each curve first, then every line on top so none hides another
+  const traces = shown.map(c => ({
+    type: "scatter", mode: "lines", x: c.xs, y: c.ys, fill: "tozeroy",
+    fillcolor: withAlpha(c.color, 0.22), line: {width: 0}, hoverinfo: "skip",
+  }));
+  for (const c of shown){
+    traces.push({
+      type: "scatter", mode: "lines", x: c.xs, y: c.ys, name: c.name,
+      line: {color: c.color, width: 1.8}, hoverlabel: hover(c.color),
+      hovertemplate: `<b>${esc(c.name)}</b><br>${lab} %{x:.${d}f}<br>density %{y:.3f}` +
+        `<br>n=${c.n} · mean ${fmt(c.mean, d)} · median ${fmt(c.median, d)}<extra></extra>`,
+    });
+  }
+  // the median, as a short tick on the baseline in the method's colour
+  if (shown.length) traces.push({
+    type: "scatter", mode: "markers", x: shown.map(c => c.median), y: shown.map(() => ymax * 0.035),
+    marker: {symbol: "line-ns-open", size: 8, color: shown.map(c => c.color),
+             line: {width: 2, color: shown.map(c => c.color)}},
+    hovertext: shown.map(c => `<b>${esc(c.name)}</b><br>median ${fmt(c.median, d)}`),
+    hovertemplate: "%{hovertext}<extra></extra>", cliponaxis: false,
+    hoverlabel: {bgcolor: panel, bordercolor: shown.map(c => c.color), font: {color: ink, size: 11}},
+  });
+  const notes = [];
+  /* The reference is ONE molecule, so it has no spread of its own. It is drawn as a
+     dashed curve like the others: a kernel of the methods' median bandwidth centred
+     on its value, its peak matched to the tallest method curve so it neither towers
+     over them nor rescales the frame. Its height is not a density -- the hover says so. */
+  if (refV !== null){
+    const bws = curves.map(c => c.bw).sort((a, b) => a - b);
+    const rk = kde([refV], lo, hi, quantile(bws, 0.5) || hMin, 120);
+    const peak = Math.max(...rk.ys) || 1;
+    const ry = rk.ys.map(y => y / peak * ytop);
+    const tip = `<b>Reference</b><br>${lab} ${fmt(refV, d)}` +
+                `<br>one molecule: shape only, height matched to the tallest curve<extra></extra>`;
+    traces.push({
+      type: "scatter", mode: "lines", x: rk.xs, y: ry, fill: "tozeroy",
+      fillcolor: withAlpha(ink, 0.05), line: {width: 0}, hoverinfo: "skip",
+    }, {
+      type: "scatter", mode: "lines", x: rk.xs, y: ry, name: "Reference",
+      line: {color: ink, width: 1.6, dash: "4px,3px"}, hoverlabel: hover(ink),
+      hovertemplate: tip,
+    });
+    // beside the peak, inside the frame; flips left near the right edge
+    const flip = refV > hi - (hi - lo) * 0.15;
+    notes.push({text: "<b>ref</b>", x: refV, y: ytop, xanchor: flip ? "right" : "left",
+                yanchor: "top", xshift: flip ? -6 : 6, showarrow: false,
+                bgcolor: panel, borderpad: 1, font: {size: 10, color: ink}});
+  }
+
+  const axis = {fixedrange: true, showgrid: false, zeroline: false, showline: true,
+                linecolor: faint, linewidth: 1, ticks: "outside", ticklen: 3,
+                tickcolor: faint, tickfont: {size: 10, color: muted}};
+  const layout = {
+    width: W, height: H, margin: {l: m.l, r: m.r, t: m.t, b: m.b, pad: 0},
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    showlegend: false, hovermode: "closest", hoverdistance: 30,
+    font: {family: getComputedStyle(document.body).fontFamily, size: 10, color: muted},
+    xaxis: Object.assign({range: [lo, hi], tickvals: xt.ticks,
+                          ticktext: xt.ticks.map(t => t.toFixed(xd))}, axis),
+    yaxis: Object.assign({range: [0, ymax], tickvals: yt.ticks,
+                          ticktext: yt.ticks.map(t => t.toFixed(yd)),
+                          title: {text: "density", standoff: 2,
+                                  font: {size: 9.5, color: faint}}}, axis),
+    annotations: notes,
+  };
+  if (div.firstChild && !div._fullLayout) div.innerHTML = "";   // it held a message
+  Plotly.react(div, traces, layout,
+               {displayModeBar: false, responsive: false, doubleClick: false, scrollZoom: false});
+}
+
+// ---------------------------------------------------------------- pose
+/* All three poses are offered; the ones this build has no coordinates for are
+   disabled and say why on hover, rather than being hidden (so it is clear they
+   exist as a concept) or silently falling back to the generated pose. */
+function buildPoseRow(){
+  S.poses = S.man.poses || [{key:"generated", label:"Generated", suffix:"",
+                             available:true, why:null}];
+  const avail = S.poses.filter(x => x.available);
+  /* Start on the first pose (docked > minimized > generated) that EVERY method has,
+     so the page opens with a molecule in each panel. A pose only some methods have
+     is still one click away, with the rest greyed over. */
+  const all = S.man.methods.map(m => m.name);
+  const full = avail.find(x => !x.methods || all.every(n => x.methods.includes(n)));
+  S.pose = (full || avail[0] || S.poses[0]).key;
+  // the pane's row and the inspector's mirror of it
+  for (const host of [$("poserow"), $("in-pose")]){
+    if (!host) continue;
+    host.innerHTML = "";
+    for (const v of S.poses){
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.dataset.pose = v.key;
+      b.textContent = v.label;
+      b.disabled = !v.available;
+      b.title = v.available
+        ? `Show the ${v.label.toLowerCase()} pose`
+        : (v.why || "not available in this build");
+      b.onclick = () => setPose(v.key);
+      host.appendChild(b);
+    }
+  }
+  paintPose();
+}
+function paintPose(){
+  document.querySelectorAll("[data-pose]").forEach(b =>
+    b.classList.toggle("on", b.dataset.pose === S.pose));
+}
+function setPose(key){
+  const v = S.poses.find(x => x.key === key);
+  if (!v || !v.available || key === S.pose) return;
+  S.pose = key;
+  paintPose();
+  render();                                   // every panel, same molecule each
+  if (S.insp) drawInspect(false).catch(e => console.error("inspector:", e));
+}
+
+// ---------------------------------------------------------------- pocket info
+/* The detail popup shows the pocket as it ships -- protein, reference ligand and
+   surface all on, at the defaults -- next to what is known about the entry. It has
+   its own stage so none of the panel settings or the camera sync reach it. */
+async function openInfo(t){
+  const box = $("pocketinfo");
+  const pdb = pdbIdOf(t.ligand_filename);
+  $("pi-title").textContent = `${pdb} — ${(t.ligand_filename||"").split("/").pop()}`;
+  $("pi-sub").textContent = t.ligand_filename || "";
+
+  const mols = Object.values(t.methods || {}).reduce((a, x) => a + (x.n || 0), 0);
+  const nmeth = Object.keys(t.methods || {}).length;
+  const subdir = (t.ligand_filename || "").split("/")[0] || "—";
+  const link = (href, text) =>
+    `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
+
+  const secs = [
+    ["Structure", [
+      ["PDB ID", link(`https://www.rcsb.org/structure/${pdb}`, pdb), ""],
+      ["RCSB", link(`https://www.rcsb.org/structure/${pdb}`, `rcsb.org/…/${pdb}`), ""],
+      ["PDBe", link(`https://www.ebi.ac.uk/pdbe/entry/pdb/${pdb.toLowerCase()}`,
+                    `ebi.ac.uk/pdbe/${pdb.toLowerCase()}`), ""],
+    ]],
+    ["CrossDocked", [
+      ["Pocket directory", subdir, "mono"],
+      ["Ligand file", (t.ligand_filename||"").split("/").pop(), "mono"],
+      ["Pocket index", String(t.pocket_index), ""],
+    ]],
+    ["This pocket", [
+      ["Methods", String(nmeth), ""],
+      ["Generated molecules", mols.toLocaleString(), ""],
+      ["Receptor used", "10 Å crop", ""],
+    ]],
+  ];
+
+  const d = (S.target === t.target) ? S.data : null;
+  const r = d && d.reference;
+  const refRows = [];
+  if (r){
+    const add = (lab, k, dg) => {
+      if (r[k] === null || r[k] === undefined) return;
+      refRows.push([lab, Number(r[k]).toFixed(dg), ""]);
+    };
+    add("Vina dock", "vina_dock", 2);
+    add("QED", "qed", 2);
+    add("SA", "sa", 2);
+    add("Heavy atoms", "n_atoms", 0);
+    if (r.smiles) refRows.push(["SMILES", r.smiles, "mono"]);
+  } else {
+    refRows.push(["—", "select this pocket to load its numbers", ""]);
+  }
+  secs.push(["Reference ligand", refRows]);
+
+  $("pi-facts").innerHTML = secs.map(([title, rows]) =>
+    `<div class="pi-sec"><h4>${title}</h4><table>` +
+    rows.map(([k, v, cls]) =>
+      `<tr><td class="k">${k}</td><td class="v ${cls}">${v}</td></tr>`).join("") +
+    `</table></div>`).join("");
+
+  box.classList.add("open");
+  $("pi-fullcap").textContent = `Deposited structure — RCSB ${pdb}`;
+  drawInfo(t.target).catch(e => console.error("crop view:", e));
+  drawFull(pdb, t.target).catch(e => console.error("full view:", e));
+}
+
+function cssVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function rgb01(hex){
+  const n = parseInt(hex.replace("#", ""), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
+async function drawInfo(target){
+  /* The crop, drawn as it ships: protein, sidechains, surface and the crystal
+     ligand, all on, at the defaults. Its own stage, so nothing here is affected by
+     the panel settings. */
+  const host = $("pi-view");
+  if (typeof NGL === "undefined"){
+    host.innerHTML = '<div class="msg">NGL did not load</div>';
+    return;
+  }
+  if (!S.infoStage) S.infoStage = new NGL.Stage(host, {backgroundColor:"white"});
+  const stage = S.infoStage;
+  stage.removeAllComponents();
+  stage.handleResize();
+  const base = `data/struct/${target}`;
+  const pocket = await grab(`${base}/pocket.pdb`);
+  const ref = await grab(`${base}/ref.sdf`);
+  let cropComp = null;
+  if (pocket){
+    cropComp = await stage.loadFile(new Blob([pocket], {type:"text/plain"}), {ext:"pdb"});
+    cropComp.addRepresentation("cartoon", {colorValue:cssVar("--mol-protein"),
+                                           colorScheme:"uniform", opacity:.85});
+    cropComp.addRepresentation("licorice", {sele:"sidechainAttached and not water",
+                                            radius:.1, aspectRatio:1,
+                                            colorScheme:"element", opacity:.85});
+    cropComp.addRepresentation("surface", {opacity:.2, colorScheme:"uniform",
+                                           colorValue:cssVar("--mol-surface"),
+                                           surfaceType:"sas", probeRadius:1.4,
+                                           side:"front"});
+  }
+  if (ref){
+    const c = await stage.loadFile(new Blob([ref], {type:"text/plain"}), {ext:"sdf"});
+    c.addRepresentation("licorice", {radius:.2, aspectRatio:1, colorScheme:"element",
+                                     colorValue:cssVar("--mol-ligand-c")});
+  }
+  // centred on the crop -- the full view is framed on the same box
+  if (cropComp) cropComp.autoView(); else stage.autoView();
+}
+
+/* Pair the deposited entry's atoms with the crop's by (chain, residue, atom name).
+   CrossDocked crops are cut from the deposited structure, often in the SAME frame
+   (4YHJ, 3B6H: 0.000 A apart) and sometimes rigidly shifted (2Z3H 0.7 A, 3DZH 1.9 A).
+   Sequence-alignment superposition on a crop of scattered fragments can pair the
+   wrong residues -- which is what made the two views disagree. Matching atoms by
+   identity cannot. Falls back to ignoring the chain if the crop relabelled chains. */
+function pairAtoms(fullSt, cropSt, useChain){
+  const key = a => (useChain ? a.chainname + "|" : "") + a.resno + "|" + a.atomname;
+  const crop = new Map();
+  cropSt.eachAtom(a => { if (!crop.has(key(a))) crop.set(key(a), [a.x, a.y, a.z]); });
+  const P = [], Q = [], seen = new Set();
+  fullSt.eachAtom(a => {                    // first model / first altloc wins
+    const k = key(a);
+    if (seen.has(k)) return;
+    const c = crop.get(k);
+    if (!c) return;
+    seen.add(k);
+    P.push(a.x, a.y, a.z); Q.push(c[0], c[1], c[2]);
+  });
+  return {full: new Float32Array(P), crop: new Float32Array(Q), n: P.length / 3,
+          cropAtoms: crop.size};
+}
+function rmsd(A, B){
+  let s = 0;
+  for (let i = 0; i < A.length; i++){ const d = A[i] - B[i]; s += d * d; }
+  return Math.sqrt(s / (A.length / 3));
+}
+
+async function drawFull(pdb, target){
+  /* The full receptor is not on this box -- only the 10 A crop ships. RCSB serves the
+     deposited entry with Access-Control-Allow-Origin: *, so the browser fetches it,
+     moves it into the crop's frame, and frames the view on the crop. */
+  const host = $("pi-full"), cap = $("pi-fullcap");
+  if (typeof NGL === "undefined") return;
+  if (!S.fullStage) S.fullStage = new NGL.Stage(host, {backgroundColor:"white"});
+  const stage = S.fullStage;
+  stage.removeAllComponents();
+  stage.handleResize();
+  if (!/^[0-9A-Z]{4}$/.test(pdb)){ cap.textContent = "Deposited structure — no PDB id"; return; }
+
+  cap.title = "";
+  cap.textContent = `RCSB ${pdb} — fetching…`;
+  let full;
+  try {
+    full = await stage.loadFile(`https://files.rcsb.org/download/${pdb}.cif`, {ext:"cif"});
+  } catch (e) {
+    cap.textContent = `Deposited structure — could not fetch ${pdb} from RCSB`;
+    return;
+  }
+
+  const cropText = await grab(`data/struct/${target}/pocket.pdb`);
+  const refText = await grab(`data/struct/${target}/ref.sdf`);
+  let crop = null, note = "", aligned = false;
+  if (cropText){
+    crop = await stage.loadFile(new Blob([cropText], {type:"text/plain"}), {ext:"pdb"});
+    crop.setVisibility(false);         // supplies the frame, the box and the centre
+    let m = pairAtoms(full.structure, crop.structure, true);
+    if (m.n < 0.5 * m.cropAtoms) m = pairAtoms(full.structure, crop.structure, false);
+    if (m.n >= 20){
+      const before = rmsd(m.full, m.crop);
+      if (before > 0.05){
+        new NGL.Superposition(m.full, m.crop).transform(full.structure);
+        full.updateRepresentations({position:true});
+      }
+      const after = rmsd(pairAtoms(full.structure, crop.structure, m.n >= 0.5 * m.cropAtoms)
+                           .full, m.crop);
+      aligned = after < 1.0;
+      note = `aligned on ${m.n} atoms, RMSD ${after.toFixed(2)} Å` +
+             (before > 0.05 ? ` (was ${before.toFixed(2)})` : " (same frame)");
+    } else {
+      note = `only ${m.n} atoms in common with the crop -- not aligned`;
+    }
+  }
+
+  full.addRepresentation("cartoon", {colorValue:cssVar("--mol-context"),
+                                     colorScheme:"uniform", opacity:.55,
+                                     depthWrite:false, side:"front"});
+  full.addRepresentation("licorice", {sele:"hetero and not water and not ion",
+                                      radius:.16, aspectRatio:1, colorScheme:"element",
+                                      opacity:.45, depthWrite:false});
+  // the crop's own ligand, which for a cross-docked pocket is NOT the entry's ligand
+  if (refText && aligned){
+    const r = await stage.loadFile(new Blob([refText], {type:"text/plain"}), {ext:"sdf"});
+    r.addRepresentation("licorice", {radius:.2, aspectRatio:1, colorScheme:"element",
+                                     colorValue:cssVar("--mol-ligand-c")});
+  }
+
+  if (aligned && crop){
+    try {
+      const bb = cropBounds(crop.structure);
+      const {corners, edges} = boxEdges(bb.min, bb.max);
+      const BOX = rgb01(cssVar("--mol-box"));
+      const frame = new NGL.Shape("crop-frame");
+      for (const [a, b] of edges) frame.addCylinder(a, b, BOX, 0.2);
+      stage.addComponentFromObject(frame).addRepresentation("buffer");
+      const faces = new NGL.Shape("crop-faces");
+      const pos = boxFaces(corners);
+      const col = new Float32Array(pos.length);
+      for (let i = 0; i < col.length; i += 3){ col[i] = BOX[0]; col[i+1] = BOX[1]; col[i+2] = BOX[2]; }
+      faces.addMesh(pos, col);
+      stage.addComponentFromObject(faces)
+           .addRepresentation("buffer", {opacity:.08, side:"double", depthWrite:false});
+    } catch (err){
+      console.error("crop box:", err);
+    }
+    cap.innerHTML = `RCSB ${pdb} &middot; ` +
+                    `<b style="color:${cssVar("--mol-box")}">box = 10 &#8491; crop</b>`;
+    cap.title = note;                  // e.g. "aligned on 440 atoms, RMSD 0.00 A"
+  } else {
+    cap.textContent = `RCSB ${pdb} · ${note || "no crop to align to"}`;
+  }
+
+  // centred on the crop, same as the left view
+  if (crop && aligned) crop.autoView(); else stage.autoView();
+  setTimeout(() => {
+    syncInfoStages();
+    if (S.infoStage && aligned){        // start both on the exact same camera
+      S.infoSyncing = true;
+      stage.viewerControls.orient(S.infoStage.viewerControls.getOrientation());
+      S.infoSyncing = false;
+    }
+  }, 150);
+}
+
+// ---------------------------------------------------------------- inspector
+/* The magnifier on a panel opens that same molecule large: the identical scene
+   (buildScene), its own camera starting from the panel's, and every metric the
+   panel has no room for. Stepping here steps the panel too, so closing returns to
+   whatever was being looked at. */
+const INSPECT_GROUPS = [
+  {label:"Vina", items:[["vina_score","score"],["vina_min","min"],["vina_dock","dock"]]},
+  {label:"Molecule quality", items:[["qed","QED"],["sa","SA"],["logp","logP"],
+    ["lipinski","Lipinski"],["n_atoms","heavy atoms"],["sim_to_ref","sim. to ref"]]},
+  {label:"Pose", tree:true},
+];
+
+function openInspect(c){
+  S.insp = c;
+  $("inspect").classList.add("open");
+  drawInspect(true).catch(e => console.error("inspector:", e));
+}
+
+function paintInspect(){
+  const c = S.insp; if (!c) return;
+  const row = cardRow(c);
+  $("in-title").textContent = c.label;
+  $("in-sub").textContent = `Pocket ${S.target.replace("target_","")}`;
+  const n = c.rows.length;
+  $("in-pos").textContent = (n && c.i >= 0) ? `molecule ${c.i + 1} / ${n}` : "—";
+  $("in-prev").disabled = !n || c.i <= 0 || c.isRef;
+  $("in-next").disabled = !n || c.i >= n - 1 || c.isRef;
+  const smi = row ? (row[1] || "") : "";
+  $("in-smi").textContent = smi || "—";
+  $("in-copy").style.visibility = smi ? "" : "hidden";
+
+  const valueOf = k => {
+    const sp = S.metrics[k];
+    const v = row ? row[S.colIdx[k]] : null;
+    if (k === "pb_valid"){
+      const np = row ? row[S.colIdx.n_pass] : null;
+      const nc = row ? row[S.colIdx.n_checks] : null;
+      const cls = v === null ? " na" : (v ? " pass" : " fail");
+      const txt = v === null ? "—" : (v ? "pass" : "fail") +
+        ((np === null || nc === null || nc === undefined) ? "" : `<span class="frac">${np}/${nc}</span>`);
+      return `<span class="v${cls}">${txt}</span>`;
+    }
+    return `<span class="v${v === null ? " na" : ""}">${fmt(v, sp ? sp.digits : 2)}</span>`;
+  };
+  let html = "";
+  for (const g of INSPECT_GROUPS){
+    html += `<div class="sgroup"><div class="sgl">${g.label}</div>`;
+    if (g.tree){ html += treeHTML(POSE_TREE, 0, valueOf) + "</div>"; continue; }
+    for (const [k, lab] of g.items){
+      const sp = S.metrics[k]; if (!sp) continue;
+      const v = row ? row[S.colIdx[k]] : null;
+      let txt = fmt(v, sp.digits), cls = v === null ? " na" : "";
+      if (k === "pb_valid"){
+        const np = row ? row[S.colIdx.n_pass] : null;
+        const nc = row ? row[S.colIdx.n_checks] : null;
+        txt = v === null ? "—" : (v ? "pass" : "fail") +
+          ((np === null || nc === null || nc === undefined)
+            ? "" : `<span class="frac">${np}/${nc}</span>`);
+        cls = v === null ? " na" : (v ? " pass" : " fail");
+      }
+      const ct = ROW_CONTACT[k];
+      const eye = ct ? `<button class="ceye" data-ct="${ct}"></button>` : "";
+      html += `<div class="st${ct ? " hasEye" : ""}" title="${sp.label}${sp.unit ? " (" + sp.unit + ")" : ""}">` +
+              `<span class="k">${lab}</span><span class="v${cls}">${txt}</span>${eye}</div>`;
+    }
+    html += "</div>";
+  }
+  $("in-metrics").innerHTML = html;
+  const ipf = $("in-metrics").querySelector(".pbfails");
+  if (ipf) ipf.innerHTML = pbFailHTML(row);
+  wireFolds($("in-metrics"));
+  $("in-metrics").querySelectorAll(".ceye").forEach(btn => {
+    const st = eyeState(c.cview, btn.dataset.ct);
+    btn.innerHTML = st ? EYE_OPEN : EYE_SHUT;
+    btn.classList.toggle("on", !!st);
+    if (!btn.disabled) btn.onclick = () => toggleContactRow(c, btn.dataset.ct);
+  });
+}
+
+async function drawInspect(fromPanel){
+  const c = S.insp; if (!c) return;
+  paintInspect();
+  if (typeof NGL === "undefined") return;
+  const host = $("in-view");
+  if (!S.inspStage) S.inspStage = new NGL.Stage(host, {backgroundColor:"white"});
+  const stage = S.inspStage;
+  stage.removeAllComponents();
+  stage.handleResize();
+  const p = c.pick, row = cardRow(c), missing = cardMissingPose(c);
+  host.parentElement.classList.toggle("off", !!missing || !p || !row);
+  $("in-cover").querySelector("span").textContent = missing
+    ? `no ${(poseInfo().label || S.pose).toLowerCase()} pose for ${p.name}` : "no molecule";
+  if (!p || !row || missing) return;
+  S.inspReps = await buildScene(stage, p, row, c.isRef, await sharedStructures(),
+                               c.cview);
+  // open on the panel's own camera; after that the two move independently
+  if (fromPanel && c.stage){
+    stage.viewerControls.orient(c.stage.viewerControls.getOrientation());
+  } else if (fromPanel){
+    frameStage(stage);
+  }
+}
+
+function stepInspect(d){
+  const c = S.insp; if (!c) return;
+  const j = c.i + d;
+  if (j < 0 || j >= c.rows.length) return;
+  step(c, d);                               // the panel follows
+  drawInspect(false).catch(e => console.error("inspector:", e));
+}
+
+function boxEdges(min, max){
+  const c = [];
+  for (const x of [min.x, max.x])
+    for (const y of [min.y, max.y])
+      for (const z of [min.z, max.z]) c.push([x, y, z]);
+  // corners are indexed by the bits of (x,y,z); an edge joins indices that differ
+  // by exactly one bit
+  const e = [];
+  for (let i = 0; i < 8; i++)
+    for (let j = i + 1; j < 8; j++){
+      const d = i ^ j;
+      if (d === 1 || d === 2 || d === 4) e.push([c[i], c[j]]);
+    }
+  return {corners: c, edges: e};
+}
+
+function boxFaces(c){
+  // two triangles per face, corners indexed as in boxEdges (bit 4=x, 2=y, 1=z)
+  const quads = [[0,1,3,2],[4,5,7,6],[0,1,5,4],[2,3,7,6],[0,2,6,4],[1,3,7,5]];
+  const pos = [];
+  for (const [a,b,cc,d] of quads)
+    for (const i of [a,b,cc, a,cc,d]) pos.push(c[i][0], c[i][1], c[i][2]);
+  return new Float32Array(pos);
+}
+
+function cropBounds(structure){
+  /* Walk the atoms rather than call getBoundingBox(): NGL's signature wants a target
+     Box3 in some builds, and a throw there used to take the whole view down. */
+  let mnx=Infinity, mny=Infinity, mnz=Infinity;
+  let mxx=-Infinity, mxy=-Infinity, mxz=-Infinity;
+  structure.eachAtom(a => {
+    if (a.x < mnx) mnx = a.x; if (a.x > mxx) mxx = a.x;
+    if (a.y < mny) mny = a.y; if (a.y > mxy) mxy = a.y;
+    if (a.z < mnz) mnz = a.z; if (a.z > mxz) mxz = a.z;
+  });
+  if (!isFinite(mnx)) throw new Error("the crop has no atoms");
+  return {min:{x:mnx, y:mny, z:mnz}, max:{x:mxx, y:mxy, z:mxz}};
+}
+
+function syncInfoStages(){
+  /* Once superposed the two popup viewers share a frame, so one orientation is
+     meaningful in both. Same echo guard as the panel grid, on its own flag. */
+  const pair = () => [S.infoStage, S.fullStage].filter(Boolean);
+  for (const st of pair()){
+    if (st._paired) continue;
+    st._paired = true;
+    st.viewerControls.signals.changed.add(() => {
+      if (S.infoSyncing) return;
+      S.infoSyncing = true;
+      const o = st.viewerControls.getOrientation();
+      for (const other of pair()) if (other !== st) other.viewerControls.orient(o);
+      S.infoSyncing = false;
+    });
+  }
+}
+
+// ---------------------------------------------------------------- pockets
+function pdbIdOf(lig){
+  // "GRK4_HUMAN_1_578_0/4yhj_A_rec_4yhj_an2_lig_tt_min_0.sdf" -> "4YHJ"
+  const base = (lig || "").split("/").pop();
+  const id = base.split("_")[0];
+  return /^[0-9a-z]{4}$/i.test(id) ? id.toUpperCase() : (base.slice(0, 12) || "—");
+}
+
+function renderPockets(){
+  const host = $("pockrows");
+  host.innerHTML = "";
+  for (const t of S.man.targets){
+    /* The list shows the PDB id only -- the CrossDocked filename is 50 characters of
+       pose bookkeeping, and the whole thing is on the Visualization panel once a
+       pocket is picked. */
+    const el = document.createElement("div");
+    el.className = "prow2" + (t.target === S.target ? " on" : "");
+    el.innerHTML = `<span class="idx">${t.target.replace("target_","")}</span>` +
+                   `<span class="lig" title="${t.ligand_filename||""}">` +
+                   `${pdbIdOf(t.ligand_filename)}</span>` +
+                   `<button class="info" title="Details">i</button>`;
+    el.onclick = () => selectTarget(t.target);
+    el.querySelector(".info").onclick = e => { e.stopPropagation(); openInfo(t); };
+    host.appendChild(el);
+  }
+}
+
+async function selectTarget(t){
+  S.target = t;
+  S.resetCam = true;          // a different pocket is a different frame
+  renderPockets();
+  /* The grid is NOT cleared here. Wiping it would detach the cards that render()
+     now reuses, and the panels would never come back. A dim class marks the wait. */
+  document.body.classList.add("busy");
+  try {
+    S.data = await (await fetch(`data/targets/${t}.json`)).json();
+    render();
+  } finally {
+    document.body.classList.remove("busy");
+  }
+}
+
+// ---------------------------------------------------------------- cards
+function pickRows(){
+  /* One ligand per method: the k-th best by the chosen metric. */
+  /* Every panel opens on the method's first generated molecule; the arrows walk
+     from there. Nothing is ranked -- the panel order is the fixed one from Settings
+     and the per-pocket numbers live in the statistics table. */
+  const out = [];
+  for (const m of S.man.methods){
+    const rows = S.data.methods[m.name];
+    if (!rows) continue;
+    out.push({name:m.name, color:m.color, join:m.join||{}, rows,
+              row: rows[0] || null, n: rows.length});
+  }
+  const at = {};
+  S.custom.forEach((n, i) => at[n] = i);
+  out.sort((a,b) => (at[a.name] ?? 99) - (at[b.name] ?? 99));
+  return out;
+}
+
+/* The panels are built once and then updated in place. Rebuilding them on every
+   pocket would throw away the NGL stages -- which costs a WebGL context each time,
+   loses the camera, and flashes the whole grid. Instead the card, its method name
+   and every metric label stay put, and only the values and the structures change. */
+/* PoseCheck row -> the switch it drives in the 3D. NGL does not tell an H-bond's
+   direction apart, so acceptor and donor share one switch. NGL has no vdW-contact
+   type, so those are computed here with ProLIF's rule (see vdwPairs). */
+const ROW_CONTACT = {
+  n_interactions: "all",
+  HBAcceptor: "hydrogenBond", HBDonor: "hydrogenBond",
+  Hydrophobic: "hydrophobic",
+  VdWContact: "vdw",
+};
+/* Every type is its own switch. "other" is what has no PoseCheck row (ionic,
+   pi-stacking, cation-pi, halogen, metal) and only the interactions eye moves it;
+   that eye is open while anything is drawn and turns everything on or off. */
+const CONTACT_KINDS = ["hydrogenBond", "hydrophobic", "vdw", "other"];
+function cvAny(cv){ return CONTACT_KINDS.some(k => cv[k]); }
+
+/* Pose reads as a tree: PoseCheck's numbers nest under it, the interaction types
+   nest under the interaction count, and each parent folds like a reply thread. The
+   fold state is shared by every panel, so opening a level in one opens it in all
+   and the panels stay comparable. */
+const POSE_TREE = [
+  {fold:"pc", label:"PoseCheck", children:[
+    {k:"clashes", label:"clash"},
+    {k:"strain",  label:"strain"},
+    {fold:"int", k:"n_interactions", label:"interactions", children:[
+      {k:"HBAcceptor",  label:"H-bond acc."},
+      {k:"HBDonor",     label:"H-bond don."},
+      {k:"Hydrophobic", label:"hydrophobic"},
+      {k:"VdWContact",  label:"vdW contact"},
+    ]},
+    {k:"rmsd_dock", label:"redock RMSD"},
+  ]},
+  // its children are the checks THIS molecule failed, filled in per molecule
+  {fold:"pb", k:"pb_valid", label:"PoseBusters", dyn:"pbfails"},
+];
+const FOLD_CARET = '<svg viewBox="0 0 10 6" width="8" height="6" aria-hidden="true">' +
+  '<path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+  'stroke-linecap="round"/></svg>';
+
+// one row of the tree; `val` is the rendered value for the inspector, or omitted on a
+// panel, where paintCard() fills the data-k span later
+function treeRow(node, depth, val){
+  const sp = node.k ? S.metrics[node.k] : null;
+  const ct = node.k ? ROW_CONTACT[node.k] : null;
+  const eye = ct ? `<button class="ceye" data-ct="${ct}"></button>` : "";
+  const caret = node.fold
+    ? `<button class="tfold" data-fold="${node.fold}" title="Show / hide">${FOLD_CARET}</button>`
+    : `<span class="tfold-sp"></span>`;
+  const v = node.k
+    ? (val !== undefined ? val : `<span class="v na" data-k="${node.k}">—</span>`)
+    : "";
+  const tip = sp ? `${sp.label}${sp.unit ? " (" + sp.unit + ")" : ""}` : node.label;
+  return `<div class="st tr d${depth}${node.fold ? " parent" : " leaf"}${ct ? " hasEye" : ""}"` +
+         `${node.fold ? ` data-fold-row="${node.fold}"` : ""} style="--d:${depth}" title="${tip}">` +
+         `${caret}<span class="k">${node.label}</span>${eye}${v}</div>`;
+}
+// each node wraps its row and its subtree, so a sibling's trunk can run through an
+// open subtree and :last-child marks where the trunk stops
+function treeHTML(nodes, depth, valueOf){
+  let s = "";
+  for (const n of nodes){
+    s += `<div class="tn" style="--d:${depth}">` +
+         treeRow(n, depth, valueOf && n.k ? valueOf(n.k) : undefined);
+    if (n.children)
+      s += `<div class="tsub" data-of="${n.fold}"><div>` +
+           treeHTML(n.children, depth + 1, valueOf) + `</div></div>`;
+    else if (n.dyn)
+      s += `<div class="tsub" data-of="${n.fold}"><div class="${n.dyn}"></div></div>`;
+    s += "</div>";
+  }
+  return s;
+}
+/* The PoseBusters checks this molecule failed, as rows under its verdict. pb_fail is a
+   bitmask over manifest.pb_tests (bit i = the i-th check). */
+// short names that fit a panel; the full PoseBusters name is the row's tooltip
+const PB_SHORT = {
+  inchi_convertible: "InChI convertible", internal_steric_clash: "internal clash",
+  "non-aromatic_ring_non-flatness": "ring non-flatness",
+  "protein-ligand_maximum_distance": "max dist. to protein",
+  minimum_distance_to_protein: "min dist. to protein",
+  minimum_distance_to_organic_cofactors: "min dist. org. cofactors",
+  minimum_distance_to_inorganic_cofactors: "min dist. inorg. cofactors",
+  minimum_distance_to_waters: "min dist. to waters",
+  volume_overlap_with_protein: "overlap with protein",
+  volume_overlap_with_organic_cofactors: "overlap org. cofactors",
+  volume_overlap_with_inorganic_cofactors: "overlap inorg. cofactors",
+  volume_overlap_with_waters: "overlap with waters",
+};
+function pbFailHTML(row){
+  const k = S.colIdx.pb_fail, tests = S.man.pb_tests || [];
+  const mask = (row && k !== undefined) ? row[k] : null;
+  const leaf = (label, v, cls, full) =>
+    `<div class="tn" style="--d:1"><div class="st tr d1 leaf pbf" style="--d:1" title="${full || label}">` +
+    `<span class="tfold-sp"></span><span class="k">${label}</span>` +
+    `<span class="v ${cls}">${v}</span></div></div>`;
+  if (mask === null || mask === undefined) return leaf("no check results", "", "na");
+  const failed = tests.filter((t, i) => mask & (1 << i));
+  if (!failed.length) return leaf("every check passed", "", "na");
+  return failed.map(t => leaf(PB_SHORT[t] || t.replace(/_/g, " "), "fail", "fail",
+                              t.replace(/_/g, " "))).join("");
+}
+function wireFolds(root){
+  root.querySelectorAll("[data-fold-row]").forEach(r => {
+    r.onclick = e => {
+      if (e.target.closest(".ceye")) return;   // the eye is its own control
+      const f = r.dataset.foldRow;
+      S.fold[f] = !S.fold[f];
+      document.body.classList.toggle("f-" + f, !S.fold[f]);
+    };
+  });
+}
+
+function statsSkeleton(){
+  /* Beside the viewer the column is narrow and tall, so the metrics read down it as
+     name -> value rows rather than across in a cramped 4-up grid. */
+  let h = '<div class="stats">';
+  for (const g of GROUPS){
+    h += `<div class="sgroup"><div class="sgl">${g.label}</div>`;
+    if (g.tree){ h += treeHTML(POSE_TREE, 0) + "</div>"; continue; }
+    for (const [key, short] of g.items){
+      const sp = S.metrics[key]; if (!sp) continue;
+      const ct = ROW_CONTACT[key];
+      const eye = ct ? `<button class="ceye" data-ct="${ct}"></button>` : "";
+      h += `<div class="st${SECONDARY.has(key)?" sec":""}${ct ? " hasEye" : ""}" ` +
+           `title="${sp.label}${sp.unit?" ("+sp.unit+")":""}">` +
+           `<span class="k">${short}</span>` +
+           `<span class="v na" data-k="${key}">—</span>${eye}</div>`;
+    }
+    h += "</div>";
+  }
+  return h + "</div>";
+}
+
+function makeCard(label, vid, isRef){
+  const el = document.createElement("div");
+  el.className = "card" + (isRef ? " ref" : "");
+  el.innerHTML =
+    `<div class="top">
+       <span class="name">${label}</span>
+       <span class="warns"></span>
+       <span class="nav">
+         <button class="step prev iconsq" title="Previous molecule (generation order)">&#8249;</button>
+         <span class="pos">—</span>
+         <button class="step next iconsq" title="Next molecule (generation order)">&#8250;</button>
+       </span>
+       <button class="zoom iconsq" title="Inspect in a large view">${LOUPE}</button>
+       <button class="shot iconsq" title="Capture this panel">${CAMERA}</button>
+     </div>
+     <div class="cardbody">
+       <div class="vwrap">
+         <div class="viewer" id="${vid}"></div>
+         <div class="cover"><span></span></div>
+       </div>
+       <div class="infoclip">
+         <div class="smirow">
+           <code class="smi">—</code>
+           <button class="copy iconsq" title="Copy SMILES">${COPY}</button>
+         </div>
+         ${statsSkeleton()}
+       </div>
+     </div>`;
+  const c = {el, vid, isRef, label, stage:null, pick:null, rows:[], i:-1,
+             warns: el.querySelector(".warns"),
+             smi:   el.querySelector(".smi"),
+             copy:  el.querySelector(".copy"),
+             view:  el.querySelector(".viewer"),
+             wrap:  el.querySelector(".vwrap"),
+             cover: el.querySelector(".cover span"),
+             pos:   el.querySelector(".pos"),
+             prev:  el.querySelector(".prev"),
+             next:  el.querySelector(".next"),
+             vals:  {}};
+  el.querySelectorAll("[data-k]").forEach(s => c.vals[s.dataset.k] = s);
+  // this panel's own contact view: every type off until asked for
+  c.cview = Object.fromEntries(CONTACT_KINDS.map(k => [k, false]));
+  wireFolds(el);
+  el.querySelectorAll(".ceye:not([disabled])").forEach(b => {
+    b.onclick = e => { e.stopPropagation(); toggleContactRow(c, b.dataset.ct); };
+  });
+  paintEyes(c);
+  el.querySelector(".shot").onclick = () => captureOne(c);
+  el.querySelector(".zoom").onclick = () => openInspect(c);
+  c.copy.onclick = () => copySmiles(c);
+  c.prev.onclick = () => step(c, -1);
+  c.next.onclick = () => step(c, +1);
+  return c;
+}
+
+function buildGrid(){
+  const host = $("slots");
+  host.innerHTML = "";
+  S.cards = {};
+  const add = (key, label, vid, isRef) => {
+    const c = makeCard(label, vid, isRef);
+    S.cards[key] = c;
+    host.appendChild(c.el);
+  };
+  add("Reference", "Reference", "vref", true);
+  S.man.methods.forEach((m, i) => add(m.name, m.name, "v" + i, false));
+  padSlots();
+}
+
+function padSlots(){
+  /* Pad the last row only, so the grid stays rectangular without inventing slots
+     nobody asked for. Empty cells sort to the end via a high order value, carry no
+     number, and are rebuilt whenever the column count changes. */
+  const host = $("slots");
+  host.querySelectorAll(".card.empty").forEach(e => e.remove());
+  const filled = Object.keys(S.cards || {}).length;
+  if (!filled) return;
+  const n = S.cols;
+  const total = Math.max(n, Math.ceil(filled / n) * n);
+  for (let i = filled; i < total; i++){
+    const el = document.createElement("div");
+    el.className = "card empty";
+    el.style.order = 900 + i;
+    el.innerHTML = `<span>slot</span>`;
+    host.appendChild(el);
+  }
+}
+
+function setCols(n){
+  S.cols = n;
+  document.documentElement.style.setProperty("--cols", n);
+  padSlots();
+  // The cards changed width, so the WebGL canvases have to be told.
+  setTimeout(() => liveStages().forEach(s => s.handleResize()), 60);
+}
+
+function updateCard(c, p){
+  /* Choose which molecule this card shows, then paint it. The choice is the ranking
+     metric's pick; the arrows walk from there through the generation order. */
+  // same pocket, same method: stay on the molecule being looked at (a pose switch
+  // should show THIS molecule docked, not jump back to the first one)
+  const keep = c.target === S.target && c.pick && p && c.pick.name === p.name ? c.i : -1;
+  c.pick = p;
+  c.rows = (p && p.rows) ? p.rows : (p && p.row ? [p.row] : []);
+  c.i = (keep >= 0 && keep < c.rows.length) ? keep
+      : (p && p.row) ? c.rows.indexOf(p.row) : -1;
+  c.target = S.target;
+  paintCard(c);
+}
+
+function step(c, d){
+  if (!c.rows.length) return;
+  const j = c.i + d;
+  if (j < 0 || j >= c.rows.length) return;
+  c.i = j;
+  paintCard(c);
+  mountOne(c);
+}
+
+function paintCard(c){
+  /* Values only -- the name, the metric labels and the viewer element are already
+     on screen and must not move. */
+  const p = c.pick;
+  const row = (c.i >= 0 && c.i < c.rows.length) ? c.rows[c.i] : null;
+  const pf = c.el.querySelector(".pbfails");
+  if (pf) pf.innerHTML = pbFailHTML(row);
+
+  if (c.rows.length && c.i >= 0){
+    c.pos.textContent = `${c.i + 1} / ${c.rows.length}`;
+    c.prev.disabled = c.i === 0;
+    c.next.disabled = c.i === c.rows.length - 1;
+  } else {
+    c.pos.textContent = "—";
+    c.prev.disabled = c.next.disabled = true;
+  }
+
+  let w = "";
+  const meta = (S.man.methods || []).find(m => p && m.name === p.name);
+  if (meta && meta.note) w += `<span class="warn info" title="${meta.note}">run</span>`;
+  if (p){
+    const jb = Object.entries(p.join || {}).filter(([,j]) => j.mode !== "mol_idx");
+    if (jb.length){
+      const tip = jb.map(([ev,j]) => `${ev}: ${j.caveat||"joined on SMILES"}`).join("\n");
+      w += `<span class="warn" title="${tip}">join</span>`;
+    }
+  }
+  c.warns.innerHTML = w;
+
+  const smi = row ? (row[1] || "") : "";
+  c.smiles = smi;                       // what the copy button copies, never the placeholder
+  c.smi.textContent = smi || "—";
+  c.smi.title = smi;
+  c.copy.disabled = !smi;
+  c.copy.style.visibility = smi ? "" : "hidden";
+
+  for (const [k, span] of Object.entries(c.vals)){
+    const sp = S.metrics[k];
+    const v = row ? row[S.colIdx[k]] : null;
+    if (k === "pb_valid"){
+      // The verdict alone hides how close a failure was; show how many of the
+      // checks it actually passed next to it.
+      const np = row ? row[S.colIdx.n_pass] : null;
+      const nc = row ? row[S.colIdx.n_checks] : null;
+      span.className = "v" + (v === null ? " na" : (v ? " pass" : " fail"));
+      span.innerHTML = v === null ? "—"
+        : (v ? "pass" : "fail") +
+          ((np === null || nc === null || nc === undefined)
+            ? "" : `<span class="frac">${np}/${nc}</span>`);
+    } else {
+      span.className = "v" + (v === null ? " na" : "");
+      span.textContent = fmt(v, sp ? sp.digits : 2);
+    }
+  }
+}
+
+function render(){
+  if (!S.data) return;
+  if (!S.cards || !Object.keys(S.cards).length) buildGrid();
+  S.token += 1;
+
+  const picks = pickRows();
+  const num = S.data.target.replace("target_", "");
+  $("viztitle").textContent = `Visualization — Pocket ${num}`;
+  $("vizsub").textContent = S.data.ligand_filename || "";
+  renderStats();
+
+  const r = S.data.reference;
+  const refPick = (r && r.smiles)
+    ? {name:"Reference", color:"#8A8F94", join:{}, n:0, nVal:0,
+       row:[-1, r.smiles].concat(S.man.cols.slice(2).map(c => r[c] ?? null))}
+    : null;
+
+  // The reference always leads; the methods follow in the chosen order. Reordering
+  // is a CSS `order` change on grid items, so no node is destroyed or recreated.
+  const refCard = S.cards["Reference"];
+  if (refCard){
+    refCard.el.style.order = 0;
+    refCard.el.style.display = refPick ? "" : "none";
+    if (refPick) updateCard(refCard, refPick);
+  }
+  const seen = new Set();
+  picks.forEach((p, i) => {
+    const c = S.cards[p.name];
+    if (!c) return;
+    seen.add(p.name);
+    c.el.style.order = i + 1;
+    c.el.style.display = "";
+    updateCard(c, p);
+  });
+  // A method with nothing for this pocket keeps its place but shows no stale values.
+  for (const [name, c] of Object.entries(S.cards)){
+    if (name === "Reference" || seen.has(name)) continue;
+    c.el.style.order = 800;
+    updateCard(c, null);
+  }
+
+  mountAll(refPick, picks, S.token);
+}
+
+// ---------------------------------------------------------------- NGL
+/* Structure files are held as strings. A pocket is ~1.4 MB of them, so caching every
+   pocket you visit would reach ~139 MB after all 100. Keep the last few and drop the
+   rest -- stepping back one pocket stays instant, browsing stays bounded. */
+const CACHE_POCKETS = 8;
+const textCache = new Map();          // insertion-ordered, so it doubles as an LRU
+const CACHE_MAX = CACHE_POCKETS * 12; // pocket.pdb + ref.sdf + a record per method
+
+/* One molecule out of a file of a hundred. The target shard carries each record's
+   byte length, so a prefix sum gives the offset and a Range request fetches only
+   that slice -- ~2 KB instead of the ~220 KB file. A server that ignores Range
+   answers 200 with the whole body; that is detected, cached and sliced locally, so
+   the viewer is correct either way. */
+function recordRange(method, i){
+  const spans = (S.data && S.data.spans && S.data.spans[method]) || null;
+  if (!spans || i < 0 || i >= spans.length) return null;
+  let start = 0;
+  for (let k = 0; k < i; k++) start += spans[k];
+  return {start, end: start + spans[i] - 1};
+}
+
+async function grabRecord(url, method, i){
+  const r = recordRange(method, i);
+  if (!r){                                   // no span table -- whole file, as before
+    const all = await grab(url);
+    return all ? all.split("$$$$\n")[i] + "$$$$\n" : null;
+  }
+  const key = `${url}#${r.start}`;
+  if (textCache.has(key)) return textCache.get(key);
+  let rec = null;
+  try {
+    const res = await fetch(url, {headers:{Range:`bytes=${r.start}-${r.end}`}});
+    if (res.status === 206) rec = await res.text();
+    else if (res.ok){
+      // Range ignored; keep the body we already paid for and slice it
+      const all = await res.text();
+      textCache.set(url, all);
+      rec = all.slice(r.start, r.end + 1);
+    }
+  } catch (e) { rec = null; }
+  if (rec === null){
+    const all = await grab(url);
+    rec = all ? all.slice(r.start, r.end + 1) : null;
+  }
+  textCache.set(key, rec);
+  while (textCache.size > CACHE_MAX) textCache.delete(textCache.keys().next().value);
+  return rec;
+}
+
+async function grab(url){
+  if (textCache.has(url)){
+    const v = textCache.get(url);
+    textCache.delete(url); textCache.set(url, v);   // touch
+    return v;
+  }
+  const r = await fetch(url);
+  const v = r.ok ? await r.text() : null;
+  textCache.set(url, v);
+  while (textCache.size > CACHE_MAX) textCache.delete(textCache.keys().next().value);
+  return v;
+}
+
+function stageOf(c){
+  /* One stage per card, created once and reused. Reusing it is what keeps the
+     camera: nothing is disposed, so nothing has to be restored. */
+  if (c.stage) return c.stage;
+  c.stage = new NGL.Stage(c.view, {backgroundColor:"white"});
+  attachSync(c.stage);
+  return c.stage;
+}
+
+function liveStages(){
+  return Object.values(S.cards || {}).map(c => c.stage).filter(Boolean);
+}
+
+function poseInfo(){
+  return S.poses.find(x => x.key === S.pose) || {};
+}
+function poseSuffix(){ return poseInfo().suffix || ""; }
+
+function poseHasMethod(name){
+  /* A pose is selectable as soon as ONE method has it; the ones that do not are
+     covered, because showing their generated pose under a "Docked" label would be
+     a quiet lie. */
+  const list = poseInfo().methods;
+  return Array.isArray(list) ? list.includes(name) : true;
+}
+
+async function sharedStructures(){
+  const base = `data/struct/${S.target}`;
+  return {
+    base,
+    // always: the contacts need it even when the pocket itself is hidden
+    pocket: await grab(`${base}/pocket.pdb`),
+    ref: await grab(`${base}/ref.sdf`),
+  };
+}
+
+async function buildScene(stage, p, row, isRef, shared, cv){
+  /* One scene, two places: every panel, and the inspector popup. Kept in one function
+     so the big view can never drift from the panel it enlarges. Ligands are sticks
+     only -- NGL calls that `licorice`. Returns the representations so the panels can
+     restyle them live. */
+  const reps = {};
+  const {base, pocket, ref} = shared;
+  let pocketComp = null, ligComp = null;
+  if (pocket){
+    const comp = await stage.loadFile(new Blob([pocket], {type:"text/plain"}),
+                                      {ext:"pdb"});
+    pocketComp = comp;
+    stage.frameComp = comp;             // what "frame the view" means for this scene
+    if (S.style.poc > 0){
+      reps.pocCartoon = comp.addRepresentation("cartoon",
+        {color:"#DDDDDD", opacity:.55});
+      reps.pocStick = comp.addRepresentation("licorice",
+        {sele:"sidechainAttached and not water", radius:S.style.poc, aspectRatio:1,
+         colorScheme:"element", opacity:.75, depthWrite:true, side:"front"});
+      if (!S.show.pocket){ reps.pocCartoon.setVisibility(false);
+                           reps.pocStick.setVisibility(false); }
+    }
+    if (S.style.surf > 0){
+      // White and near-transparent: the shape of the cavity, not another coloured
+      // object competing with the ligand.
+      reps.surf = comp.addRepresentation("surface",
+        {opacity:S.style.surf, colorScheme:"uniform", colorValue:"#FFFFFF",
+         surfaceType:"sas", probeRadius:1.4, side:"front"});
+      if (!S.show.surface) reps.surf.setVisibility(false);
+      S.surfBuilt = true;
+    }
+  }
+
+  if (isRef){
+    // The crystal ligand IS this panel's molecule -- solid, never also ghosted.
+    if (ref){
+      const comp = await stage.loadFile(new Blob([ref], {type:"text/plain"}), {ext:"sdf"});
+      reps.lig = comp.addRepresentation("licorice",
+        {radius:S.style.lig, aspectRatio:1, colorValue:p.color, colorScheme:"uniform"});
+      if (S.style.lig <= 0) reps.lig.setVisibility(false);
+      ligComp = comp;
+    }
+    addContacts(stage, pocketComp, ligComp, reps, cv);
+    return reps;
+  }
+  if (ref){
+    /* The crystal pose at the SAME thickness as the generated one -- they are there
+       to be compared -- set back by transparency. With depthWrite OFF every atom
+       showed darker than its bonds: one sphere and several bond ends overlap there,
+       and each overlapping layer was blended again. With it ON, the first fragment
+       at a pixel wins and the ghost is one even wash; the opaque ligand is drawn
+       before any transparent object, so what hides what is still right. */
+    const comp = await stage.loadFile(new Blob([ref], {type:"text/plain"}), {ext:"sdf"});
+    reps.ref = comp.addRepresentation("licorice",
+      {radius:S.style.lig * REF_THIN, aspectRatio:1, colorValue:cssVar("--mol-ghost"),
+       colorScheme:"uniform", opacity:S.style.refOpacity,
+       depthWrite:true, side:"front"});
+    if (!S.show.ref) reps.ref.setVisibility(false);
+  }
+  const rec = await grabRecord(`${base}/${p.name}${poseSuffix()}.sdf`,
+                               p.name + poseSuffix(), row[0]);
+  if (rec && rec.trim()){
+    const comp = await stage.loadFile(new Blob([rec], {type:"text/plain"}), {ext:"sdf"});
+    reps.lig = comp.addRepresentation("licorice",
+      {radius:S.style.lig, aspectRatio:1, colorValue:p.color, colorScheme:"uniform"});
+    if (S.style.lig <= 0) reps.lig.setVisibility(false);
+    ligComp = comp;
+  }
+  addContacts(stage, pocketComp, ligComp, reps, cv);
+  if (!pocketComp) stage.frameComp = ligComp;
+  return reps;
+}
+
+/* Frame a stage on its pocket, not on everything in it: stage.autoView() fits every
+   component, contacts and helpers included. */
+function frameStage(stage, ms){
+  const f = stage.frameComp;
+  if (f && stage.compList.includes(f)) f.autoView(ms || 0);
+  else stage.autoView(ms || 0);
+}
+
+/* Where the ligand actually touches the pocket. NGL computes contacts within ONE
+   structure, so the pocket and this ligand are concatenated into a throwaway copy.
+   An SDF ligand comes in with residue name HET, which is what tells the two apart:
+   filterSele keeps only HET <-> protein pairs. This is NGL's geometric detection, so
+   its count will not equal PoseCheck's ProLIF numbers shown beside it. Each panel
+   turns them on with its own eyes.
+   NGL's contact representation is kept hidden and used only as the engine: its
+   getContactData() hands back each contact's two feature centres, its type and the
+   atoms behind it, and the picture is drawn here as dumbbells -- a bead on every
+   atom taking part, joined by a bar. */
+function contactParams(cv){
+  const t = S.contactTypes;
+  const hb = !!cv.hydrogenBond, hp = !!cv.hydrophobic, ot = !!cv.other;
+  return {
+    filterSele: ["[HET]", "protein"],
+    hydrogenBond: hb, backboneHydrogenBond: hb, hydrophobic: hp,
+    piStacking: ot && t.piStacking, cationPi: ot && t.cationPi,
+    ionicInteraction: ot && t.ionicInteraction, halogenBond: ot && t.halogenBond,
+    metalCoordination: ot && t.metalCoordination,
+    weakHydrogenBond: false, waterHydrogenBond: false,
+    labelVisible: false,
+    /* concatStructures puts the pocket in model 0 and the ligand in model 1, and NGL
+       drops every contact between two models unless one of them is the master. With
+       the default (-1) not one ligand-pocket contact survived. */
+    masterModelIndex: 1,
+  };
+}
+// NGL's contact type codes -> the colour token for that type
+const CT_TOKEN = {1:"--int-ionic", 2:"--int-cationpi", 3:"--int-pistack",
+                  4:"--int-hbond", 5:"--int-halogen", 6:"--int-hydrophobic",
+                  7:"--int-metal", 9:"--int-hbond", 10:"--int-hbond"};
+const BELL_BEAD = 0.34, BELL_BAR = 0.075, BELL_BEAD_OPACITY = 0.6;
+function rgb01(hex){
+  const n = parseInt(hex.replace("#", ""), 16);
+  return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
+}
+function addContacts(stage, pocketComp, ligComp, reps, cv){
+  reps.pocketComp = pocketComp;           // kept so a toggle can add contacts later
+  reps.ligComp = ligComp;                 // without rebuilding the scene
+  if (cv && cvAny(cv)) ensureContacts(stage, reps, cv);
+}
+function ensureContacts(stage, reps, cv){
+  if (!reps.pocketComp || !reps.ligComp) return;
+  if (!reps.contacts){
+    try {
+      const merged = NGL.concatStructures("complex", reps.pocketComp.structure,
+                                          reps.ligComp.structure);
+      const mc = stage.addComponentFromObject(merged);
+      reps.contacts = mc.addRepresentation("contact",
+        Object.assign(contactParams(cv), {visible: false}));
+    } catch (e) {
+      console.error("contacts:", e);
+      return;
+    }
+  } else {
+    reps.contacts.setParameters(contactParams(cv));
+  }
+  drawDumbbells(stage, reps, cv);
+}
+function clearDumbbells(stage, reps){
+  for (const comp of reps.bells || []){ try { stage.removeComponent(comp); } catch(e){} }
+  reps.bells = null;
+}
+/* ProLIF's VdWContact, which PoseCheck counts: two atoms closer than the sum of
+   their van der Waals radii (tolerance 0), with its default (MDAnalysis) radii.
+   ProLIF reports it once per residue, so the closest pair per residue is drawn and
+   the dumbbells line up with the vdW count on the panel. Heavy atoms only -- the
+   crop carries no hydrogens, so the count can still differ from PoseCheck's. */
+const VDW_R = {H:1.10, C:1.70, N:1.55, O:1.52, S:1.80, P:1.80, F:1.47, CL:1.75,
+               BR:1.85, I:1.98, SE:1.90};
+function vdwPairs(pocket, lig){
+  const L = [];
+  lig.eachAtom(a => {
+    const e = a.element.toUpperCase();
+    if (e !== "H") L.push([a.x, a.y, a.z, VDW_R[e] || 1.7]);
+  });
+  const best = new Map();                    // residue -> its closest pair
+  pocket.eachAtom(a => {
+    const e = a.element.toUpperCase();
+    if (e === "H" || a.isWater()) return;
+    const r = VDW_R[e] || 1.7;
+    for (const l of L){
+      const d = Math.hypot(a.x - l[0], a.y - l[1], a.z - l[2]);
+      if (d > r + l[3]) continue;
+      const key = a.chainname + ":" + a.resno;
+      const b = best.get(key);
+      if (!b || d < b.d) best.set(key, {d, p: [a.x, a.y, a.z], l: [l[0], l[1], l[2]]});
+    }
+  });
+  return [...best.values()];
+}
+
+function drawDumbbells(stage, reps, cv){
+  clearDumbbells(stage, reps);
+  const bars = new NGL.Shape("contact bars"), beads = new NGL.Shape("contact atoms");
+  const beaded = new Set();
+  let n = 0;
+  const bead = (xyz, col, tok) => {
+    const key = xyz.map(v => v.toFixed(2)).join(",") + tok;   // one bead per atom and type
+    if (beaded.has(key)) return;
+    beaded.add(key);
+    beads.addSphere(xyz, col, BELL_BEAD, "interacting atom");
+  };
+
+  const r = reps.contacts && reps.contacts.repr;
+  if (r && r.structureView && (cv.hydrogenBond || cv.hydrophobic || cv.other)){
+    let d = null;
+    try { d = r.getContactData(r.structureView); }
+    catch (e) { console.error("contacts:", e); }
+    if (d && d.position1.length){
+      const {features, contactStore} = d.picking.contacts;
+      const ap = d.picking.structure.getAtomProxy();
+      for (let i = 0; i < d.position1.length / 3; i++){
+        const ci = d.picking.array[i];
+        const tok = CT_TOKEN[contactStore.type[ci]] || "--int-hbond";
+        const col = rgb01(cssVar(tok));
+        bars.addCylinder([d.position1[3*i], d.position1[3*i+1], d.position1[3*i+2]],
+                         [d.position2[3*i], d.position2[3*i+1], d.position2[3*i+2]],
+                         col, BELL_BAR, "interaction");
+        n++;
+        // a ring's contact runs centre to centre, but every ring atom gets its bead
+        for (const f of [contactStore.index1[ci], contactStore.index2[ci]])
+          for (const a of features.atomSets[f]){ ap.index = a; bead([ap.x, ap.y, ap.z], col, tok); }
+      }
+    }
+  }
+  if (cv.vdw && reps.pocketComp && reps.ligComp){
+    const col = rgb01(cssVar("--int-vdw"));
+    for (const v of vdwPairs(reps.pocketComp.structure, reps.ligComp.structure)){
+      bars.addCylinder(v.p, v.l, col, BELL_BAR, "vdW contact");
+      bead(v.p, col, "vdw"); bead(v.l, col, "vdw");
+      n++;
+    }
+  }
+  if (!n) return;
+  const cb = stage.addComponentFromObject(bars);
+  cb.addRepresentation("buffer");
+  const ca = stage.addComponentFromObject(beads);
+  ca.addRepresentation("buffer", {opacity: BELL_BEAD_OPACITY, depthWrite: true,
+                                  side: "front"});
+  reps.bells = [cb, ca];
+}
+
+/* Adding a component must not move the camera. Hold the orientation across it and
+   put it back -- once now and once on the next frame, in case anything settles
+   through NGL's animation loop. */
+function keepCamera(stage, fn){
+  const o = stage.viewerControls.getOrientation().clone();
+  fn();
+  const back = () => { S.syncing = true; stage.viewerControls.orient(o); S.syncing = false; };
+  back();
+  requestAnimationFrame(back);
+}
+
+/* Bring one scene in line with a contact view: compute on first use, then redraw
+   only the dumbbells. Nothing else in the scene is touched. */
+function applyContactView(stage, reps, cv){
+  if (!stage || !reps) return;
+  keepCamera(stage, () => {
+    if (cvAny(cv)) ensureContacts(stage, reps, cv);
+    else clearDumbbells(stage, reps);
+  });
+}
+
+function refreshPanelContacts(c){
+  applyContactView(c.stage, c.reps, c.cview);
+  if (S.insp === c) applyContactView(S.inspStage, S.inspReps, c.cview);
+  paintEyes(c);
+  if (S.insp === c) paintInspect();
+}
+
+function toggleContactRow(c, ct){
+  const cv = c.cview;
+  if (ct === "all"){
+    const on = !cvAny(cv);
+    CONTACT_KINDS.forEach(k => cv[k] = on);
+  } else {
+    cv[ct] = !cv[ct];                        // one type, and only that type
+  }
+  refreshPanelContacts(c);
+}
+
+function eyeState(cv, ct){
+  return ct === "all" ? cvAny(cv) : !!cv[ct];
+}
+
+function paintEyes(c){
+  c.el.querySelectorAll(".ceye").forEach(b => {
+    const st = eyeState(c.cview, b.dataset.ct);
+    b.innerHTML = st ? EYE_OPEN : EYE_SHUT;
+    b.classList.toggle("on", st);
+    b.title = (st ? "Hide" : "Show") + " these in this panel's 3D";
+  });
+}
+
+const EYE_OPEN = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6S1.5 10 1.5 10z"/>' +
+  '<circle cx="10" cy="10" r="2.6"/></svg>';
+const EYE_SHUT = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6S1.5 10 1.5 10z"/>' +
+  '<path d="M3 17L17 3"/></svg>';
+
+function cardRow(c){
+  return (c.i >= 0 && c.i < c.rows.length) ? c.rows[c.i] : null;
+}
+function cardMissingPose(c){
+  return !c.isRef && c.pick && !poseHasMethod(c.pick.name);
+}
+
+async function mountCard(c, shared){
+  const stage = stageOf(c);
+  stage.removeAllComponents();
+  const p = c.pick, row = cardRow(c), missing = cardMissingPose(c);
+  c.wrap.classList.toggle("off", !!missing || !p || !row);
+  c.cover.textContent = missing
+    ? `no ${(poseInfo().label || S.pose).toLowerCase()} pose for ${p.name}`
+    : "no molecule";
+  if (!p || !row || missing) return;
+  c.reps = await buildScene(stage, p, row, c.isRef, shared, c.cview);
+}
+
+/* autoView() does NOT take effect synchronously: NGL applies it inside the animation
+   loop's tick, so even a zero-duration one lands on a later frame. Reading a stage's
+   orientation before that tick returns the DEFAULT camera -- and forcing that onto
+   every panel points them all at the origin, which for a pocket 100 A away means the
+   ligand is simply off screen. So: frame first, then propagate once the tick has
+   certainly run. */
+function frameAndSync(stages, token){
+  if (!stages.length) return;
+  stages.forEach(s => frameStage(s));
+  setTimeout(() => {
+    if (token !== S.token) return;
+    S.syncing = true;
+    const o = stages[0].viewerControls.getOrientation();
+    for (const s of stages) s.viewerControls.orient(o);
+    S.syncing = false;
+  }, 120);
+}
+
+function copySmiles(c){
+  /* navigator.clipboard needs a secure context, which plain http on a lab box is
+     not -- so fall back to the old textarea trick, which works anywhere. */
+  const text = c.smiles || "";
+  if (!text) return;
+  const done = () => {
+    toast("Copied!");
+    c.copy.innerHTML = CHECK;
+    c.copy.classList.add("done");
+    setTimeout(() => { c.copy.innerHTML = COPY; c.copy.classList.remove("done"); }, 1100);
+  };
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done, () => legacyCopy(text) && done());
+    return;
+  }
+  if (legacyCopy(text)) done();
+}
+
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(S.toastTimer);
+  S.toastTimer = setTimeout(() => t.classList.remove("show"), 1200);
+}
+
+function legacyCopy(text){
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch(e){ ok = false; }
+  ta.remove();
+  return ok;
+}
+
+async function mountOne(c){
+  if (typeof NGL === "undefined") return;
+  await mountCard(c, await sharedStructures());
+}
+
+async function mountAll(refPick, picks, token){
+  const live = () => token === S.token;
+  if (typeof NGL === "undefined"){
+    Object.values(S.cards || {}).forEach(c => {
+      c.view.innerHTML = '<div class="msg">NGL did not load (no network?) — ' +
+        'the numbers are unaffected.</div>';
+    });
+    return;
+  }
+
+  const shared = await sharedStructures();
+  if (!live()) return;
+
+  const cards = [];
+  if (refPick && S.cards["Reference"]) cards.push(S.cards["Reference"]);
+  picks.forEach(p => { const c = S.cards[p.name]; if (c) cards.push(c); });
+
+  for (const c of cards){
+    if (!live()) return;
+    await mountCard(c, shared);
+  }
+  if (!live()) return;
+
+  // A new pocket is a new frame, so frame it. Otherwise the stages were never
+  // disposed, so the camera is already where the user left it -- leave it alone.
+  if (S.resetCam){
+    S.resetCam = false;
+    frameAndSync(liveStages(), token);
+  }
+}
+
+function attachSync(stage){
+  /* Every panel shows the same pocket in the same frame, so one orientation matrix
+     is meaningful in all of them. The flag stops the echo: orienting a peer fires
+     its own `changed`, which would orient us straight back. */
+  stage.viewerControls.signals.changed.add(() => {
+    if (S.syncing || !S.sync) return;
+    S.syncing = true;
+    const o = stage.viewerControls.getOrientation();
+    for (const s of liveStages()) if (s !== stage) s.viewerControls.orient(o);
+    S.syncing = false;
+  });
+}
+
+
+// ---------------------------------------------------------------- capture
+function scale(){ return S.dpi / CSS_DPI; }   // 300 dpi -> 3.125x the CSS pixels
+
+/* NGL renders a large image as factor x factor tiles and finishes when its tile
+   counter equals factor^2. With a FRACTIONAL factor (300/96 = 3.125) that count is
+   9.77, the integer counter never equals it, and makeImage's promise never settles --
+   which is why capture silently did nothing. Render at the next WHOLE factor, then
+   resample to the exact pixel count the DPI calls for. */
+function renderFactor(){ return Math.max(1, Math.ceil(scale())); }
+
+async function stageImage(stage){
+  const blob = await stage.makeImage({factor: renderFactor(), antialias: true,
+                                      trim: false, transparent: S.transparent});
+  return createImageBitmap(blob);
+}
+
+async function shoot(stage){
+  const img = await stageImage(stage);
+  const box = stage.viewer.container.getBoundingClientRect();
+  const w = Math.max(1, Math.round(box.width * scale()));
+  const h = Math.max(1, Math.round(box.height * scale()));
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const g = cv.getContext("2d");
+  g.imageSmoothingQuality = "high";
+  if (!S.transparent){ g.fillStyle = "#ffffff"; g.fillRect(0, 0, w, h); }
+  g.drawImage(img, 0, 0, w, h);
+  img.close?.();
+  return new Promise(res => cv.toBlob(res, "image/png"));
+}
+
+/* A PNG says nothing about DPI unless it carries a pHYs chunk; without one, image
+   software assumes 72 and a "300 dpi" figure opens at four times the size. Insert
+   it right after IHDR. */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+async function withDpi(blob, dpi){
+  const src = new Uint8Array(await blob.arrayBuffer());
+  const ppm = Math.round(dpi / 0.0254);                  // pixels per metre
+  const chunk = new Uint8Array(21);
+  const dv = new DataView(chunk.buffer);
+  dv.setUint32(0, 9);                                     // data length
+  chunk.set([0x70, 0x48, 0x59, 0x73], 4);                 // "pHYs"
+  dv.setUint32(8, ppm); dv.setUint32(12, ppm); chunk[16] = 1;   // unit: metre
+  dv.setUint32(17, crc32(chunk.subarray(4, 17)));
+  const at = 8 + 25;                                      // signature + IHDR chunk
+  const out = new Uint8Array(src.length + chunk.length);
+  out.set(src.subarray(0, at), 0);
+  out.set(chunk, at);
+  out.set(src.subarray(at), at + chunk.length);
+  return new Blob([out], {type: "image/png"});
+}
+
+function save(blob, name){
+  // Some browsers only honour click() on an anchor that is in the document.
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+async function captureOne(c){
+  const stage = c.stage;
+  if (!stage) return;
+  const btn = c.el.querySelector(".shot");
+  btn.disabled = true;
+  try {
+    const png = await withDpi(await shoot(stage), S.dpi);
+    save(png, `${S.target}_${c.label}_${S.dpi}dpi.png`);
+  } catch (e) {
+    console.error("capture failed:", e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function captureAll(){
+  const btn = $("capall"), was = btn.textContent;
+  btn.textContent = "Capturing…"; btn.disabled = true;
+  try {
+    const k = scale();
+    // Composite laid out like the screen: a uniform grid, the reference first.
+    // Sizes are CSS px, multiplied by k for the target resolution.
+    const PAD = 16, TITLE = 30, GAP = 12, CAP = 22, TILE = 260;
+    const cells = [];
+    const refc = S.cards["Reference"];
+    if (refc && refc.stage && S.data.reference && S.data.reference.smiles)
+      cells.push({stage:refc.stage, label:"Reference",
+                  value: S.data.reference.vina_dock ?? null});
+    // Use what each panel is actually SHOWING -- the arrows may have stepped it off
+    // the ranking metric's pick, and a caption that disagrees with the image is worse
+    // than no caption.
+    pickRows().forEach((p, i) => {
+      const c = S.cards[p.name];
+      if (!c || !c.stage) return;
+      const row = (c.i >= 0 && c.i < c.rows.length) ? c.rows[c.i] : null;
+      cells.push({stage:c.stage, label:`${i+1}. ${p.name}`,
+                  value: row ? row[S.colIdx.vina_dock] : null});
+    });
+    const CC = S.cols;
+    const rows = Math.max(1, Math.ceil(cells.length / CC));
+    const W = PAD + CC * TILE + (CC - 1) * GAP + PAD;
+    const H = PAD + TITLE + rows * (TILE + CAP) + (rows - 1) * GAP + PAD;
+
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+    const g = cv.getContext("2d");
+    if (!S.transparent){ g.fillStyle = "#ffffff"; g.fillRect(0, 0, cv.width, cv.height); }
+    g.scale(k, k);
+    g.textBaseline = "top";
+
+    const spec = S.metrics.vina_dock;
+    const FONT = '-apple-system, "Inter", Helvetica, Arial, sans-serif';
+    g.fillStyle = "#1D1D1F";
+    g.font = `600 15px ${FONT}`;
+    g.fillText(`Pocket ${S.target.replace("target_","")}  ·  ` +
+               `${S.data.ligand_filename||""}`, PAD, PAD);
+
+    const tile = async (stage, label, value, x, y, w, h) => {
+      if (stage){
+        const img = await stageImage(stage);
+        const s = Math.min(w / img.width, h / img.height);
+        g.drawImage(img, x + (w - img.width*s)/2, y + (h - img.height*s)/2,
+                    img.width*s, img.height*s);
+        img.close?.();
+      }
+      g.strokeStyle = "rgba(0,0,0,.10)"; g.lineWidth = 1;
+      g.strokeRect(x + .5, y + .5, w - 1, h - 1);
+      g.fillStyle = "#1D1D1F";
+      g.font = `600 11px ${FONT}`;
+      g.fillText(label, x + 2, y + h + 5);
+      g.fillStyle = "#86868B";
+      g.font = `11px ${FONT}`;
+      const t = value === null ? "—" : value.toFixed(spec.digits);
+      g.fillText(`${spec.label} ${t}`, x + 2 + g.measureText(label).width + 44, y + h + 5);
+    };
+
+    const top = PAD + TITLE;
+    for (let i = 0; i < cells.length; i++){
+      const col = i % CC, row = (i / CC) | 0;
+      await tile(cells[i].stage, cells[i].label, cells[i].value,
+                 PAD + col * (TILE + GAP),
+                 top + row * (TILE + CAP + GAP), TILE, TILE);
+    }
+    const raw = await new Promise(res => cv.toBlob(res, "image/png"));
+    save(await withDpi(raw, S.dpi), `${S.target}_all_${S.dpi}dpi.png`);
+  } finally {
+    btn.textContent = was; btn.disabled = false;
+  }
+}
+
+window.addEventListener("resize", () => liveStages().forEach(s => s.handleResize()));
+boot().catch(e => {
+  $("slots").innerHTML = `<div class="loading">failed to load: ${e}</div>`;
+});
+</script>
+</body>
+</html>

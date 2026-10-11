@@ -1,0 +1,7 @@
+# @package mae
+# Independent random blocks per ChannelViT group, so each group is inpainted from the others.
+defaults:
+  - _base
+  - _self_
+mask_strategy: per_group
+mask_ratio: 0.75

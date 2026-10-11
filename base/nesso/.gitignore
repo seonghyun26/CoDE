@@ -1,0 +1,27 @@
+# Downloaded model caches
+.cache/
+
+# CASP16 cofolding inputs/outputs (result numbers live in task1-affinity_regression/test/casp16*/CASP16_*.json)
+_casp16/
+_casp16_atx/
+
+# Generated Nesso inputs, embeddings, predictions, and logs
+_edrscc/yamls/
+_edrscc/shard_*_yamls/
+_edrscc/*shard*/
+_edrscc/test_batch_yamls/
+_edrscc/outputs/
+_edrscc/outputs_*/
+_edrscc/logs/
+_edrscc/shard_*.txt
+_edrscc/predictions*.csv
+_edrscc/results*.json
+
+# The same for the 2019 holdout (build_inputs_holdout.py, rebuild_common_pocket.py)
+_holdout2019/yamls/
+_holdout2019/shard_*
+_holdout2019/all_pids.txt
+
+**/__pycache__/
+*.py[cod]
+*.safetensors

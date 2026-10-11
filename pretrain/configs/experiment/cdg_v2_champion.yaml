@@ -1,0 +1,16 @@
+# @package _global_
+# The CDG_v2 affinity champion (model_zoo/champion): v2 encoder, atom-biased mask 0.75, cdgv2.
+# Atom-biased masking peaks at epoch 25 and then declines, hence 25 epochs; 100 shows the decline.
+defaults:
+  - override /dset: cdgv2
+  - override /model: v2
+  - override /mae: invfreq
+  - override /mask: atom_biased
+
+exp_name: cdg_v2_champion
+wandb_tags: [pretrain, cdg, 100m, v2, mask075, atombias, atomblob7, champion]
+num_epochs: 25
+# Pinned: the base moved to bsz 8 for the 40M default. At 100M and 64^3 this needs 4, and the
+# champion's effective batch was 4 x 8 = 32, not 64.
+bsz: 4
+accum_steps: 8

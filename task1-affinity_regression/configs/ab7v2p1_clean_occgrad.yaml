@@ -1,0 +1,6 @@
+# Table 2 "w. ||grad a||": atoms and the summed gradient magnitude of the atom occupancies, no density,
+# groups [7,4,1]. The live trainer dropped this input option, hence trainer: legacy; probe.py derives
+# the occupancy gradient from the encoder's cfg.
+name: 261009_ab7v2p1_clean_occgrad
+pretrain: {experiment: ab7v2p1_clean_occgrad, trainer: legacy, gpus: 0-3, overrides: [bsz=8, accum_steps=4]}
+evaluate: {condition: atomblob, gpu: 0}

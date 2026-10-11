@@ -1,0 +1,23 @@
+# @package _global_
+# Table 2 ablation "w.o. D, G (CoE)" on the ab7v2p1_clean recipe (atomblob7 v2.1 recipe on CoDE_pretrain_v1, in-vocab
+# ligands only): the 11 atom channels only, groups [7,4]; no density or gradmag in the input or the target.
+defaults:
+  - override /dset: CoDE_pretrain_v1
+  - override /model: v1
+  - override /mae: invfreq
+  - override /mask: uniform
+
+exp_name: ab7v2p1_clean_coe
+wandb_tags: [pretrain, atomblob7, CoDE_pretrain_v1, in_vocab_only, 40m, channelvit, table2, coe]
+bsz: 16              # global batch 128 = 16 x accum 2 x 4 GPUs, as the original run (32 x 4); 32 OOMs on a 3090
+accum_steps: 2
+dset: {in_vocab_only: true, n_lig_ch: 7, n_poc_ch: 4}
+model:
+  model_name: atomblob_density_vit_mae_40m
+  input_mode: atomblob
+  with_gradmag: false
+  n_in_channels: 11
+  channel_groups: [7, 4]
+  n_channels_ligand: 7
+  n_channels_pocket: 4
+mae: {channel_weighting: uniform, val_every: 1, ckpt_every: 20, channel_weight_clip_ratio: 0.0}

@@ -1,0 +1,19 @@
+# PLINDER v2 per-element, 112,733 positions: the CDG_v2 champion's corpus. Not decontaminated;
+# CoDE_pretrain_v1 is the leakage-safe view. Density comes from the precomputed 116³ box (box_path),
+# which matches resampling the maps on the fly (r > 0.999) and needs no map cache.
+dset_name: crossdocked_xray
+data_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}
+data_file: pretrain/data_train_plinder_v2_perelem.pt
+crops_dir: ''                  # OTF resample path → no frozen crops
+ccp4_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/ccp4
+resample_dir: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/pretrain/xray_resample_plinder_v2_perelem
+box_path: ${oc.env:VOXBIND_DATA_ROOT,../dataset/data}/pretrain/xray_resample_plinder_v2_perelem/box116.dat
+ligand_radius: -1              # -1 → per-atom vdW radii from the tuples
+pocket_radius: -1
+use_xray: true
+gradmag_as_density: false
+cache_size: 32
+normalize: false               # density pre-normalized in the resample recipe
+subset_n: 112000
+subset_xray_only: true
+subset_val_n: 100
