@@ -2,23 +2,30 @@
   <title id="title">CoDE — Coordinate and Density Encoder</title>
   <desc id="desc">A grey molecular surface and grey cartoon protein ribbon form a pocket around a small orange ligand. A blue electron-density mesh surrounds both. This is a schematic scientific logo, not a measured molecular structure.</desc>
   <defs>
+    <radialGradient id="protein-surface" cx=".35" cy=".28" r=".8"><stop stop-color="#CDD1D8"/><stop offset="1" stop-color="#777F8C"/></radialGradient>
     <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#AAB0B9"/><stop offset=".55" stop-color="#E5E8ED"/><stop offset="1" stop-color="#AAB0B9"/></linearGradient>
     <path id="envelope" d="M44 78 C30 46 58 22 91 32 C115 10 150 25 159 46 C190 37 216 60 207 91 C232 113 225 143 204 154 C212 182 188 206 159 199 C138 222 107 212 94 193 C63 205 37 184 44 157 C19 137 24 99 44 78Z"/>
     <clipPath id="density"><use href="#envelope"/></clipPath>
   </defs>
-  <!-- Translucent, lobed molecular surface; the pocket stays open around the ligand. -->
-  <path d="M54 52 C53 32 72 24 88 34 C106 23 128 40 122 57 C137 67 134 87 119 97 C131 109 126 130 114 139 C131 149 124 167 112 174 C124 184 143 177 153 166 C157 152 172 147 176 133 C181 118 173 106 162 93 C148 85 147 68 157 61 C149 46 163 34 177 39 C192 34 207 49 201 63 C217 74 218 94 207 103 C223 121 216 140 207 150 C216 167 202 187 186 188 C181 207 161 214 146 202 C131 216 112 210 103 202 C82 214 64 201 65 186 C45 183 33 167 42 151 C28 138 30 120 40 111 C28 96 35 77 47 72 C40 64 46 54 54 52Z"
-        fill="#BFC4CC" fill-opacity=".28" stroke="#CDD2DA" stroke-opacity=".65" stroke-width="1.5"/>
+  <!-- A newly drawn, asymmetric molecular surface encloses an open binding cleft. -->
+  <path d="M42 92 C30 78 38 57 56 54 C57 37 79 29 93 39 C110 30 127 42 128 56 C139 62 134 78 121 84 C108 89 105 102 113 111 C118 124 111 137 119 148 C128 158 145 155 154 160 C168 151 176 157 180 164 C192 157 192 142 193 131 C190 116 183 107 185 95 C173 89 168 75 178 66 C188 56 203 66 204 78 C218 81 224 100 215 110 C229 126 221 145 213 151 C220 169 204 184 190 185 C184 204 163 211 150 202 C136 213 116 208 109 198 C92 209 73 200 73 188 C53 191 40 174 44 161 C27 152 25 132 37 122 C27 111 31 99 42 92Z"
+        fill="url(#protein-surface)" fill-opacity=".55" stroke="#A5ADB9" stroke-width="1.6"/>
+  <path d="M48 87 C43 69 60 61 69 65 M78 48 C93 43 107 49 109 61 M44 143 C43 157 58 165 67 159 M119 187 C133 196 145 187 147 180 M197 101 C208 113 205 126 201 132" fill="none" stroke="#DFE3E9" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>
   <use href="#envelope" fill="#7188FF" fill-opacity=".09" stroke="#7188FF" stroke-width="2.5" stroke-opacity=".8"/>
   <g clip-path="url(#density)" fill="none" stroke="#7188FF" stroke-width="1.4" opacity=".48">
     <path d="M21 62 Q122 112 227 59 M20 91 Q123 141 234 88 M20 124 Q130 168 231 119 M26 157 Q129 195 224 152 M34 185 Q135 215 210 182"/>
     <path d="M57 18 Q24 119 83 220 M88 17 Q58 117 110 224 M119 13 Q100 116 141 220 M151 22 Q136 118 171 216 M181 32 Q172 115 198 203"/>
   </g>
-  <!-- Protein: front and back faces of a single folded ribbon. -->
-  <path d="M86 48 C45 48 46 80 87 88 C125 96 124 123 85 132 C47 141 50 169 91 178" fill="none" stroke="#656D79" stroke-width="19" stroke-linecap="round"/>
-  <path d="M87 48 C128 54 128 77 87 88 C48 99 47 120 85 132 C124 144 128 162 91 178" fill="none" stroke="url(#ribbon)" stroke-width="20" stroke-linecap="round"/>
-  <path d="M91 178 C118 195 167 189 184 163 C202 135 195 109 180 96 C162 79 160 64 178 56" fill="none" stroke="#AAB0B9" stroke-width="10" stroke-linecap="round"/>
-  <path d="M180 96 C162 79 160 64 178 56" fill="none" stroke="#E5E8ED" stroke-width="3" stroke-linecap="round"/>
+  <!-- Cartoon: a tilted alpha helix, connecting loops, and a broad beta strand. -->
+  <path d="M54 70 C50 54 68 46 82 52 C97 57 103 74 118 70 C129 67 128 54 118 50 M105 157 C93 166 88 175 99 180 M178 176 C199 177 206 155 203 139 C201 125 199 114 191 105" fill="none" stroke="#B8BEC7" stroke-width="6" stroke-linecap="round"/>
+  <!-- Narrow rear faces are occluded by the broad, twisting front ribbon. -->
+  <path d="M58 71 C43 82 61 96 88 100 C116 105 114 117 78 125 C64 133 84 148 105 157" fill="none" stroke="#636C78" stroke-width="9" stroke-linecap="round"/>
+  <g fill="url(#ribbon)" stroke="#ABB3BF" stroke-width=".7">
+    <path d="M52 68 C71 59 111 82 109 96 C107 107 77 110 68 113 L64 99 C80 96 96 96 95 92 C93 85 64 76 56 82 Z"/>
+    <path d="M66 99 C85 92 121 115 119 129 C117 140 91 143 81 146 L77 132 C90 129 107 129 105 125 C103 118 78 107 70 113 Z"/>
+    <path d="M79 132 C94 129 116 144 120 152 L110 165 C105 156 91 146 83 146 Z"/>
+    <path d="M96 175 C115 182 144 183 162 172 L157 167 L184 163 L178 187 L173 182 C149 197 117 194 95 186 Z"/>
+  </g>
   <!-- Bound small molecule, deliberately simplified for small sizes. -->
   <g fill="none" stroke="#F5B27E" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round">
     <path d="M126 112 L147 100 L168 112 L168 137 L147 149 L126 137 Z M168 137 L186 147 M147 100 L147 82"/>
