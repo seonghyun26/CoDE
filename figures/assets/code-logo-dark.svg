@@ -1,21 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="240" viewBox="0 0 640 240" role="img" aria-labelledby="title desc">
   <title id="title">CoDE — Coordinate and Density Encoder</title>
-  <desc id="desc">A blue folded protein ribbon forms a pocket around a small orange ligand. A translucent violet electron-density mesh surrounds both. This is a schematic scientific logo, not a measured molecular structure.</desc>
+  <desc id="desc">A grey molecular surface and grey cartoon protein ribbon form a pocket around a small orange ligand. A blue electron-density mesh surrounds both. This is a schematic scientific logo, not a measured molecular structure.</desc>
   <defs>
-    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#8291E8"/><stop offset=".55" stop-color="#A7B5F5"/><stop offset="1" stop-color="#8291E8"/></linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#AAB0B9"/><stop offset=".55" stop-color="#E5E8ED"/><stop offset="1" stop-color="#AAB0B9"/></linearGradient>
     <path id="envelope" d="M44 78 C30 46 58 22 91 32 C115 10 150 25 159 46 C190 37 216 60 207 91 C232 113 225 143 204 154 C212 182 188 206 159 199 C138 222 107 212 94 193 C63 205 37 184 44 157 C19 137 24 99 44 78Z"/>
     <clipPath id="density"><use href="#envelope"/></clipPath>
   </defs>
-  <use href="#envelope" fill="#C2A4E5" fill-opacity=".09" stroke="#C2A4E5" stroke-width="2.5" stroke-opacity=".8"/>
-  <g clip-path="url(#density)" fill="none" stroke="#C2A4E5" stroke-width="1.4" opacity=".48">
+  <!-- Translucent, lobed molecular surface; the pocket stays open around the ligand. -->
+  <path d="M54 52 C53 32 72 24 88 34 C106 23 128 40 122 57 C137 67 134 87 119 97 C131 109 126 130 114 139 C131 149 124 167 112 174 C124 184 143 177 153 166 C157 152 172 147 176 133 C181 118 173 106 162 93 C148 85 147 68 157 61 C149 46 163 34 177 39 C192 34 207 49 201 63 C217 74 218 94 207 103 C223 121 216 140 207 150 C216 167 202 187 186 188 C181 207 161 214 146 202 C131 216 112 210 103 202 C82 214 64 201 65 186 C45 183 33 167 42 151 C28 138 30 120 40 111 C28 96 35 77 47 72 C40 64 46 54 54 52Z"
+        fill="#BFC4CC" fill-opacity=".28" stroke="#CDD2DA" stroke-opacity=".65" stroke-width="1.5"/>
+  <use href="#envelope" fill="#7188FF" fill-opacity=".09" stroke="#7188FF" stroke-width="2.5" stroke-opacity=".8"/>
+  <g clip-path="url(#density)" fill="none" stroke="#7188FF" stroke-width="1.4" opacity=".48">
     <path d="M21 62 Q122 112 227 59 M20 91 Q123 141 234 88 M20 124 Q130 168 231 119 M26 157 Q129 195 224 152 M34 185 Q135 215 210 182"/>
     <path d="M57 18 Q24 119 83 220 M88 17 Q58 117 110 224 M119 13 Q100 116 141 220 M151 22 Q136 118 171 216 M181 32 Q172 115 198 203"/>
   </g>
   <!-- Protein: front and back faces of a single folded ribbon. -->
-  <path d="M86 48 C45 48 46 80 87 88 C125 96 124 123 85 132 C47 141 50 169 91 178" fill="none" stroke="#394B97" stroke-width="19" stroke-linecap="round"/>
+  <path d="M86 48 C45 48 46 80 87 88 C125 96 124 123 85 132 C47 141 50 169 91 178" fill="none" stroke="#656D79" stroke-width="19" stroke-linecap="round"/>
   <path d="M87 48 C128 54 128 77 87 88 C48 99 47 120 85 132 C124 144 128 162 91 178" fill="none" stroke="url(#ribbon)" stroke-width="20" stroke-linecap="round"/>
-  <path d="M91 178 C118 195 167 189 184 163 C202 135 195 109 180 96 C162 79 160 64 178 56" fill="none" stroke="#8291E8" stroke-width="10" stroke-linecap="round"/>
-  <path d="M180 96 C162 79 160 64 178 56" fill="none" stroke="#A7B5F5" stroke-width="3" stroke-linecap="round"/>
+  <path d="M91 178 C118 195 167 189 184 163 C202 135 195 109 180 96 C162 79 160 64 178 56" fill="none" stroke="#AAB0B9" stroke-width="10" stroke-linecap="round"/>
+  <path d="M180 96 C162 79 160 64 178 56" fill="none" stroke="#E5E8ED" stroke-width="3" stroke-linecap="round"/>
   <!-- Bound small molecule, deliberately simplified for small sizes. -->
   <g fill="none" stroke="#F5B27E" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round">
     <path d="M126 112 L147 100 L168 112 L168 137 L147 149 L126 137 Z M168 137 L186 147 M147 100 L147 82"/>
@@ -29,5 +32,5 @@
     <path d="M412 73 L412 147 L432 147 C477 147 477 73 432 73 Z"/>
     <path d="M536 73 L494 73 L494 147 L536 147 M494 108 L530 108"/>
   </g>
-  <text x="260" y="182" fill="#EDF1FF" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing=".3">Coordinate and Density Encoder</text>
+  <text x="399" y="181" text-anchor="middle" fill="#EDF1FF" font-family="Arial, Helvetica, sans-serif" font-size="20" letter-spacing="0">Coordinate and Density Encoder</text>
 </svg>
