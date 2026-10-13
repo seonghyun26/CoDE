@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="figures/assets/code-logo-dark.svg">
+    <img src="figures/assets/code-logo.svg" alt="CoDE — Coordinate and Density Encoder: a protein ribbon and bound ligand within an electron-density mesh" width="520">
+  </picture>
+</p>
+
 # Blending Experimental Electron Density Information to Protein-Ligand Interaction
 
 [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX)
